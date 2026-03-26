@@ -68,8 +68,8 @@ export const recordSession = async (userId, sessionData) => {
     const { error: profileError } = await supabase
       .from('profiles')
       .update({
-        coins: (profileData.coins || 0) + (xpEarned || 0),
-        xp: (profileData.xp || 0) + (coinsEarned || 0),
+        coins: (profileData.coins || 0) + (coinsEarned || 0),
+        xp: (profileData.xp || 0) + (xpEarned || 0),
         total_study_time: (profileData.total_study_time || 0) + durationMinutes,
         completed_sessions: (profileData.completed_sessions || 0) + 1,
         updated_at: new Date().toISOString(),
@@ -77,6 +77,25 @@ export const recordSession = async (userId, sessionData) => {
       .eq('id', userId);
 
     if (profileError) console.error('Error updating profile rewards:', profileError);
+  }
+
+  // Update daily streak study time
+  const today = new Date().toISOString().split('T')[0];
+  const { data: streak, error: streakError } = await supabase
+    .from('daily_streaks')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('date', today)
+    .single();
+
+  if (!streakError && streak) {
+    await supabase
+      .from('daily_streaks')
+      .update({ 
+        study_time: (streak.study_time || 0) + durationMinutes,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', streak.id);
   }
 
   // Update challenge progress if applicable

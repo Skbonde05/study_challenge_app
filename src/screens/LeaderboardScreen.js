@@ -15,6 +15,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useRealtime } from '../hooks/useRealtime';
+import ScreenHeader from '../components/common/ScreenHeader';
 
 const LeaderboardScreen = ({ navigation }) => {
   const { theme } = useAppTheme();
@@ -116,39 +117,42 @@ const LeaderboardScreen = ({ navigation }) => {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
       
-      {/* Dynamic Header */}
-      <View style={[styles.header, { backgroundColor: theme.colors.primary }]}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity onPress={() => navigation.goBack()}><Icon name="arrow-left" size={24} color="#FFF" /></TouchableOpacity>
-          <Text style={styles.headerTitle}>Leaderboard</Text>
-          <View style={{ width: 24 }} />
-        </View>
+      <ScreenHeader 
+        title="Leaderboard" 
+        onBack={() => navigation.goBack()} 
+        theme={theme}
+      />
 
+      <View style={[styles.statsHeader, { backgroundColor: theme.colors.card }]}>
         {/* Timeframe Selector */}
-        <View style={styles.timeframeBox}>
+        <View style={[styles.timeframeBox, { backgroundColor: theme.colors.background }]}>
           {Object.keys(timeframeLabels).map(key => (
             <TouchableOpacity 
               key={key} 
               style={[styles.timeBtn, timeframe === key && styles.timeBtnActive]} 
               onPress={() => setTimeframe(key)}
             >
-              <Text style={[styles.timeText, timeframe === key && { color: theme.colors.primary }]}>{timeframeLabels[key]}</Text>
+              <Text style={[styles.timeText, timeframe === key ? { color: theme.colors.primary } : { color: theme.colors.secondaryText }]}>
+                {timeframeLabels[key]}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
 
         {/* User Rank Summary */}
         {myRank && (
-          <View style={styles.userSummary}>
-            <View style={styles.userRankBadge}><Text style={styles.userRankNo}>#{myRank.rank}</Text></View>
-            <View style={styles.userCol}>
-              <Text style={styles.userLabel}>YOUR RANK</Text>
-              <Text style={styles.userVal}>{myRank.xp?.toLocaleString()} XP</Text>
+          <View style={[styles.userSummary, { backgroundColor: theme.colors.background }]}>
+            <View style={[styles.userRankBadge, { backgroundColor: theme.colors.primary }]}>
+              <Text style={styles.userRankNo}>#{myRank.rank}</Text>
             </View>
-            <View style={styles.userDivider} />
             <View style={styles.userCol}>
-              <Text style={styles.userLabel}>STREAK</Text>
-              <Text style={styles.userVal}>{myRank.current_streak} Days</Text>
+              <Text style={[styles.userLabel, { color: theme.colors.secondaryText }]}>YOUR RANK</Text>
+              <Text style={[styles.userVal, { color: theme.colors.text }]}>{myRank.xp?.toLocaleString()} XP</Text>
+            </View>
+            <View style={[styles.userDivider, { backgroundColor: theme.colors.border }]} />
+            <View style={styles.userCol}>
+              <Text style={[styles.userLabel, { color: theme.colors.secondaryText }]}>STREAK</Text>
+              <Text style={[styles.userVal, { color: theme.colors.text }]}>{myRank.current_streak} Days</Text>
             </View>
           </View>
         )}
@@ -176,20 +180,27 @@ const LeaderboardScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { padding: 16, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, elevation: 8 },
-  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  headerTitle: { color: '#FFF', fontSize: 20, fontWeight: 'bold' },
-  timeframeBox: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: 4, marginBottom: 20 },
+  statsHeader: {
+    paddingTop: 16,
+    paddingBottom: 24,
+    paddingHorizontal: 16,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    marginTop: -20,
+    zIndex: 5,
+    elevation: 4,
+  },
+  timeframeBox: { flexDirection: 'row', borderRadius: 20, padding: 4, marginBottom: 16 },
   timeBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 16 },
-  timeBtnActive: { backgroundColor: '#FFF' },
-  timeText: { color: '#FFF', fontWeight: 'bold', fontSize: 13 },
-  userSummary: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)', padding: 16, borderRadius: 24, gap: 16 },
-  userRankBadge: { backgroundColor: '#FFD700', width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
-  userRankNo: { fontWeight: 'bold', fontSize: 16, color: '#1D1D1F' },
+  timeBtnActive: { backgroundColor: '#FFF', elevation: 2 },
+  timeText: { fontWeight: 'bold', fontSize: 13 },
+  userSummary: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 20, gap: 12, elevation: 1 },
+  userRankBadge: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  userRankNo: { fontWeight: 'bold', fontSize: 16, color: '#FFF' },
   userCol: { flex: 1 },
-  userLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: 'bold' },
-  userVal: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
-  userDivider: { width: 1, height: 30, backgroundColor: 'rgba(255,255,255,0.2)' },
+  userLabel: { fontSize: 9, fontWeight: 'bold' },
+  userVal: { fontSize: 15, fontWeight: 'bold' },
+  userDivider: { width: 1, height: 24 },
   topThreeContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-end', gap: 12, padding: 24 },
   topThreeCard: { flex: 1, backgroundColor: '#FFF', borderRadius: 24, alignItems: 'center', padding: 16, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8 },
   topThreeCardEmpty: { flex: 1 },

@@ -10,7 +10,7 @@ export const useRealtime = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    let profileSub, challengeSub, notificationSub, messageSub, leaderboardSub;
+    let profileSub, challengeSub, notificationSub, messageSub, leaderboardSub, sessionSub, streakSub;
 
     const setupSubscriptions = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -25,24 +25,18 @@ export const useRealtime = () => {
             const currentProfile = queryClient.getQueryData(['profile']);
             
             // Conflict Resolution Logics:
-            // Check if the update is newer than our current local data
             if (currentProfile && payload.new.updated_at) {
               const currentUpdateAt = new Date(currentProfile.updated_at || 0).getTime();
               const newUpdateAt = new Date(payload.new.updated_at).getTime();
               
               if (newUpdateAt < currentUpdateAt) {
-                // The received update is older, ignore it for now (or handle differently)
                 console.log('Ignore stale profile update from real-time sync.');
                 return;
               }
             }
 
-            // Update cache with fresh data
-            queryClient.setQueryData(['profile'], payload.new);
+            // Invalidate to fetch fresh data
             queryClient.invalidateQueries({ queryKey: ['profile'] });
-            
-            // Re-sync related data that often changes with profile (coins/xp)
-            queryClient.invalidateQueries({ queryKey: ['daily-challenge'] });
           }
         )
         .subscribe();
@@ -59,47 +53,66 @@ export const useRealtime = () => {
         )
         .subscribe();
 
-      // 3. Listen for notifications (New Table)
-      notificationSub = supabase
-        .channel(`notification-changes-${user.id}`)
-        .on('postgres_changes', 
-          { event: 'INSERT', schema: 'public', table: 'user_notifications', filter: `user_id=eq.${user.id}` },
-          () => {
-            queryClient.invalidateQueries({ queryKey: ['notifications'] });
-          }
-        )
-        .subscribe();
-
-      // 4. Listen for classroom messages
-      messageSub = supabase
-        .channel(`classroom-messages-${user.id}`)
-        .on('postgres_changes', 
-          { event: 'INSERT', schema: 'public', table: 'classroom_messages' },
-          () => {
-            queryClient.invalidateQueries({ queryKey: ['classroom-messages'] });
-          }
-        )
-        .subscribe();
-
-      // 5. Listen for broad profile updates that affect Leaderboard
-      leaderboardSub = supabase
-        .channel('public-profile-changes')
-        .on('postgres_changes', 
-          { event: 'UPDATE', schema: 'public', table: 'profiles' },
-          (payload) => {
-            // We check if this profile change belongs to someone on our currrently loaded leaderboard
-            const currentItems = queryClient.getQueriesData({ queryKey: ['leaderboard'] });
-            const isOnLeaderboard = currentItems.some(([key, data]) => 
-              data?.pages?.some(page => page.some(p => p.id === payload.new.id))
+      // 3. Listen for sessions and streaks (NEW for Dashbaord fully real-time)
+      const setupOptionalSub = (channelName, table, queryKey) => {
+        try {
+          const sub = supabase
+            .channel(channelName)
+            .on('postgres_changes', 
+              { event: '*', schema: 'public', table, filter: `user_id=eq.${user.id}` },
+              () => {
+                queryClient.invalidateQueries({ queryKey: [queryKey] });
+              }
             );
-
-            if (isOnLeaderboard) {
-              // Only invalidate if the change actually affects the current list to save performance
-              queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
+          
+          sub.subscribe((status) => {
+            if (status === 'CHANNEL_ERROR') {
+              console.warn(`Could not subscribe to ${table} (maybe table missing?)`);
             }
-          }
-        )
-        .subscribe();
+          });
+          return sub;
+        } catch (e) {
+          console.warn(`Subscription failed for ${table}:`, e.message);
+          return null;
+        }
+      };
+
+      sessionSub = setupOptionalSub(`session-changes-${user.id}`, 'study_sessions', 'recent-sessions');
+      streakSub = setupOptionalSub(`streak-changes-${user.id}`, 'daily_streaks', 'daily-challenge');
+      notificationSub = setupOptionalSub(`notification-changes-${user.id}`, 'user_notifications', 'notifications');
+
+      // 4. Classroom messages (No filter as they are global to the classroom usually)
+      try {
+        messageSub = supabase
+          .channel(`classroom-messages-${user.id}`)
+          .on('postgres_changes', 
+            { event: 'INSERT', schema: 'public', table: 'classroom_messages' },
+            () => {
+              queryClient.invalidateQueries({ queryKey: ['classroom-messages'] });
+            }
+          )
+          .subscribe();
+      } catch (e) {
+        console.warn('Classroom messages subscription failed:', e.message);
+      }
+
+      // 5. Leaderboard changes
+      try {
+        leaderboardSub = supabase
+          .channel('public-profile-changes')
+          .on('postgres_changes', 
+            { event: 'UPDATE', schema: 'public', table: 'profiles' },
+            () => {
+              const currentItems = queryClient.getQueriesData({ queryKey: ['leaderboard'] });
+              if (currentItems.length > 0) {
+                queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
+              }
+            }
+          )
+          .subscribe();
+      } catch (e) {
+        console.warn('Leaderboard subscription failed:', e.message);
+      }
     };
 
     setupSubscriptions();
@@ -107,6 +120,8 @@ export const useRealtime = () => {
     return () => {
       if (profileSub) profileSub.unsubscribe();
       if (challengeSub) challengeSub.unsubscribe();
+      if (sessionSub) sessionSub.unsubscribe();
+      if (streakSub) streakSub.unsubscribe();
       if (notificationSub) notificationSub.unsubscribe();
       if (messageSub) messageSub.unsubscribe();
       if (leaderboardSub) leaderboardSub.unsubscribe();

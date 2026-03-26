@@ -22,6 +22,7 @@ import { useProfile } from '../hooks/useProfile';
 import { useChallenges } from '../hooks/useChallenges';
 import { useSessions } from '../hooks/useSessions';
 import { useRealtime } from '../hooks/useRealtime';
+import { useNotifications } from '../hooks/useNotifications';
 
 // Sub-components
 import StatCard from '../components/dashboard/StatCard';
@@ -43,6 +44,7 @@ export default function Dashboard({ navigation }) {
     refetch: refetchChallenges 
   } = useChallenges();
   const { recentSessions, isLoading: loadingSessions, refetch: refetchSessions } = useSessions();
+  const { unreadCount } = useNotifications();
   
   // Real-time synchronization
   useRealtime();
@@ -126,13 +128,14 @@ export default function Dashboard({ navigation }) {
         <DashboardHeader 
           navigation={navigation} 
           theme={theme} 
-          badgeCount={badges.length} 
+          badgeCount={unreadCount} 
         />
       </LinearGradient>
 
       <ScrollView
         ref={scrollViewRef}
-        showsVerticalScrollIndicator={false}
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={true}
         refreshControl={
           <RefreshControl
             refreshing={false}
@@ -142,6 +145,7 @@ export default function Dashboard({ navigation }) {
           />
         }
         contentContainerStyle={[styles.scrollContent, { paddingTop: 120 }]}
+        nestedScrollEnabled={true}
       >
         {/* Welcome Section */}
         <LinearGradient
@@ -296,7 +300,7 @@ export default function Dashboard({ navigation }) {
           <View style={styles.actionsGrid}>
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('Timer')}
+              onPress={() => navigation.navigate('TimerTab')}
             >
               <LinearGradient
                 colors={[theme.colors.primary, theme.colors.primaryDark]}
@@ -477,7 +481,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingBottom: 40,
+    paddingBottom: 100,
   },
   welcomeSection: {
     borderRadius: 24,

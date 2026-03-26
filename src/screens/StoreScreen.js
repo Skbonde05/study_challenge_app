@@ -19,6 +19,7 @@ import { useAppTheme } from '../theme/useAppTheme';
 import { useStore } from '../hooks/useStore';
 import { useProfile } from '../hooks/useProfile';
 import { useRealtime } from '../hooks/useRealtime';
+import ScreenHeader from '../components/common/ScreenHeader';
 
 const { width } = Dimensions.get('window');
 
@@ -127,25 +128,27 @@ const StoreScreen = ({ navigation }) => {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
       
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: theme.colors.border, backgroundColor: theme.colors.card }]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-left" size={24} color={theme.colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Store</Text>
-        <View style={styles.headerCurrency}>
-          <View style={[styles.currencyBox, { backgroundColor: theme.colors.background }]}>
-            <Icon name="coin" size={16} color="#FFD700" />
-            <Text style={[styles.currencyText, { color: theme.colors.text }]}>{currentCoins}</Text>
+      <ScreenHeader 
+        title="Store" 
+        onBack={() => navigation.goBack()} 
+        theme={theme}
+        rightElement={
+          <View style={styles.headerCurrency}>
+            <View style={[styles.currencyBox, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+              <Icon name="coin" size={16} color="#FFD700" />
+              <Text style={[styles.currencyText, { color: '#FFF' }]}>{currentCoins}</Text>
+            </View>
+            <View style={[styles.currencyBox, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+              <Icon name="diamond" size={16} color="#5AC8FA" />
+              <Text style={[styles.currencyText, { color: '#FFF' }]}>{currentGems}</Text>
+            </View>
           </View>
-          <View style={[styles.currencyBox, { backgroundColor: theme.colors.background }]}>
-            <Icon name="diamond" size={16} color="#5AC8FA" />
-            <Text style={[styles.currencyText, { color: theme.colors.text }]}>{currentGems}</Text>
-          </View>
-        </View>
-      </View>
+        }
+      />
 
       <ScrollView 
+        style={{ flex: 1 }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={false} onRefresh={handleRefresh} colors={[theme.colors.primary]} />}
       >

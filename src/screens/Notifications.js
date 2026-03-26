@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar, ScrollView } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../theme/useAppTheme';
+import ScreenHeader from '../components/common/ScreenHeader';
 
 export default function Notifications({ navigation }) {
   const { theme } = useAppTheme();
@@ -9,18 +10,23 @@ export default function Notifications({ navigation }) {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
-      <View style={[styles.header, { backgroundColor: theme.colors.primary }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()}><Icon name="arrow-left" size={24} color="#FFF" /></TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifications</Text>
-        <TouchableOpacity><Text style={styles.clearText}>Clear</Text></TouchableOpacity>
-      </View>
-      <View style={styles.content}>
+      <ScreenHeader 
+        title="Notifications" 
+        onBack={() => navigation.goBack()} 
+        theme={theme}
+        rightElement={
+          <TouchableOpacity>
+            <Text style={styles.clearText}>Clear</Text>
+          </TouchableOpacity>
+        }
+      />
+      <ScrollView contentContainerStyle={styles.content}>
         <Icon name="bell-outline" size={80} color={theme.colors.border} style={styles.icon} />
         <Text style={[styles.title, { color: theme.colors.text }]}>No Notifications</Text>
         <Text style={[styles.description, { color: theme.colors.secondaryText }]}>
           You're all caught up! Check back later for study reminders and achievement updates.
         </Text>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

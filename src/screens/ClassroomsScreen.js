@@ -18,6 +18,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useClassrooms } from '../hooks/useClassrooms';
 import { useRealtime } from '../hooks/useRealtime';
+import ScreenHeader from '../components/common/ScreenHeader';
 
 const { width } = Dimensions.get('window');
 
@@ -35,8 +36,12 @@ const ClassroomCard = memo(({ classroom, onJoin, theme }) => (
         <Icon name="school" size={24} color={theme.colors.primary} />
       </View>
       <View style={styles.headerInfo}>
-        <Text style={[styles.cardTitle, { color: theme.colors.text }]} numberOfLines={1}>{classroom.name}</Text>
-        <Text style={[styles.cardMeta, { color: theme.colors.secondaryText }]}>By {classroom.created_by?.username} • {classroom.member_count} Members</Text>
+        <Text style={[styles.cardTitle, { color: theme.colors.text }]} numberOfLines={1}>
+          {classroom.name}
+        </Text>
+        <Text style={[styles.cardMeta, { color: theme.colors.secondaryText }]}>
+          By {classroom.creator?.username || 'Teacher'} • {classroom.member_count || 0} Members
+        </Text>
       </View>
     </View>
     
@@ -113,31 +118,31 @@ const ClassroomsScreen = ({ navigation }) => {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
       
-      {/* Dynamic Header */}
-      <View style={[styles.header, { backgroundColor: theme.colors.primary }]}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Icon name="arrow-left" size={24} color="#FFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Classroom Hub</Text>
+      <ScreenHeader 
+        title="Classroom Hub" 
+        onBack={() => navigation.goBack()} 
+        theme={theme}
+        rightElement={
           <TouchableOpacity onPress={() => setShowJoinModal(true)}>
             <Icon name="plus-circle-outline" size={24} color="#FFF" />
           </TouchableOpacity>
-        </View>
+        }
+      />
 
+      <View style={[styles.tabSection, { backgroundColor: theme.colors.card }]}>
         {/* Tab Switcher */}
-        <View style={styles.tabBox}>
+        <View style={[styles.tabBox, { backgroundColor: theme.colors.background }]}>
           <TouchableOpacity 
             style={[styles.tab, activeTab === 'my-rooms' && styles.tabActive]} 
             onPress={() => setActiveTab('my-rooms')}
           >
-            <Text style={[styles.tabText, activeTab === 'my-rooms' && { color: theme.colors.primary }]}>My Rooms</Text>
+            <Text style={[styles.tabText, activeTab === 'my-rooms' ? { color: theme.colors.primary } : { color: theme.colors.secondaryText }]}>My Rooms</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.tab, activeTab === 'explore' && styles.tabActive]} 
             onPress={() => setActiveTab('explore')}
           >
-            <Text style={[styles.tabText, activeTab === 'explore' && { color: theme.colors.primary }]}>Explore</Text>
+            <Text style={[styles.tabText, activeTab === 'explore' ? { color: theme.colors.primary } : { color: theme.colors.secondaryText }]}>Explore</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -195,13 +200,14 @@ const ClassroomsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { padding: 16, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, elevation: 8 },
-  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  headerTitle: { color: '#FFF', fontSize: 20, fontWeight: 'bold' },
-  tabBox: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: 4 },
+  tabSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  tabBox: { flexDirection: 'row', borderRadius: 20, padding: 4 },
   tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 16 },
-  tabActive: { backgroundColor: '#FFF' },
-  tabText: { color: '#FFF', fontWeight: 'bold', fontSize: 13 },
+  tabActive: { backgroundColor: '#FFF', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+  tabText: { fontWeight: 'bold', fontSize: 13 },
   listContent: { padding: 16, paddingBottom: 40 },
   card: { padding: 16, borderRadius: 24, marginBottom: 16, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },

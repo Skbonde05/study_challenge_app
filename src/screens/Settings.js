@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import ScreenHeader from '../components/common/ScreenHeader';
 import { supabase } from '../services/supabase';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useSettings } from '../hooks/useSettings';
@@ -40,7 +41,7 @@ const SettingsItem = ({ icon, label, description, rightComponent, onPress, color
 );
 
 const Settings = ({ navigation }) => {
-  const { theme, setThemeMode } = useAppTheme();
+  const { theme, setTheme } = useAppTheme();
   const { 
     settings, 
     updateSettings, 
@@ -58,7 +59,7 @@ const Settings = ({ navigation }) => {
     updateSettings(updated);
 
     if (key === 'darkMode') {
-      setThemeMode(value ? 'dark' : 'light');
+      setTheme(value ? 'dark' : 'light');
     }
   };
 
@@ -78,14 +79,28 @@ const Settings = ({ navigation }) => {
   };
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: async () => {
+    const performLogout = async () => {
+      try {
         await supabase.auth.signOut();
         await AsyncStorage.clear();
-        navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
-      }}
-    ]);
+      } catch (err) {
+        console.error("Logout failed:", err);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Are you sure you want to logout?');
+      if (confirmed) performLogout();
+    } else {
+      Alert.alert('Logout', 'Are you sure you want to logout?', [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Logout', 
+          style: 'destructive', 
+          onPress: performLogout
+        }
+      ]);
+    }
   };
 
   const handleDeleteAccount = () => {
@@ -153,7 +168,6 @@ const Settings = ({ navigation }) => {
     {
       title: 'Account & Support',
       items: [
-        { icon: 'account-edit-outline', label: 'Edit Profile', onPress: () => navigation.navigate('ProfileTab') },
         { icon: 'bug-outline', label: 'Report a Bug', onPress: () => setShowFeedbackModal(true) },
         { icon: 'help-circle-outline', label: 'Help & FAQ', onPress: () => Linking.openURL('https://streakify.app/help') },
         { icon: 'shield-check-outline', label: 'Privacy Policy', onPress: () => Linking.openURL('https://streakify.app/privacy') }
@@ -169,22 +183,20 @@ const Settings = ({ navigation }) => {
   ];
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <StatusBar barStyle="light-content" backgroundColor={theme.colors.primary} />
-      
-      {/* High-end Header Consistency */}
-      <View style={[styles.header, { backgroundColor: theme.colors.primary }]}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity style={styles.headerBack} onPress={() => navigation.goBack()}>
-            <Icon name="arrow-left" size={24} color="#FFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Settings</Text>
-          <View style={{ width: 40 }} />
-        </View>
-        <Text style={styles.headerSubtitle}>Personalize your study experience</Text>
-      </View>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <ScreenHeader 
+        title="Settings" 
+        onBack={() => navigation.goBack()} 
+        theme={theme}
+      />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={{ flex: 1 }}
+        contentContainerStyle={[styles.scrollContent, { flexGrow: 1, paddingBottom: 120 }]} 
+        showsVerticalScrollIndicator={true}
+        alwaysBounceVertical={true}
+        nestedScrollEnabled={true}
+      >
         {sections.map(section => (
           <View key={section.title} style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.colors.secondaryText }]}>{section.title.toUpperCase()}</Text>
@@ -242,7 +254,7 @@ const Settings = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -253,7 +265,7 @@ const styles = StyleSheet.create({
   headerBack: { padding: 4 },
   headerTitle: { color: '#FFF', fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
   headerSubtitle: { color: 'rgba(255,255,255,0.7)', fontSize: 13, textAlign: 'center' },
-  scrollContent: { padding: 16, paddingTop: 10 },
+  scrollContent: { padding: 16, paddingTop: 10, paddingBottom: 80 },
   section: { marginBottom: 25 },
   sectionTitle: { fontSize: 12, fontWeight: '900', marginLeft: 16, marginBottom: 10, letterSpacing: 1.5 },
   sectionCard: { borderRadius: 28, overflow: 'hidden', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10 },

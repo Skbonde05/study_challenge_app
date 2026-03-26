@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar, ScrollView } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../theme/useAppTheme';
+import ScreenHeader from '../components/common/ScreenHeader';
 
 export default function Goals({ navigation }) {
   const { theme } = useAppTheme();
@@ -9,11 +10,11 @@ export default function Goals({ navigation }) {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
-      <View style={[styles.header, { backgroundColor: theme.colors.primary }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()}><Icon name="arrow-left" size={24} color="#FFF" /></TouchableOpacity>
-        <Text style={styles.headerTitle}>Study Goals</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader 
+        title="Study Goals" 
+        onBack={() => navigation.goBack()} 
+        theme={theme}
+      />
       <ScrollView contentContainerStyle={styles.content}>
         <Icon name="bullseye-arrow" size={64} color={theme.colors.border} />
         <Text style={[styles.title, { color: theme.colors.text }]}>Master Your Goals</Text>

@@ -23,6 +23,7 @@ import { useProfile } from '../hooks/useProfile';
 import { useSessions } from '../hooks/useSessions';
 import { useChallenges } from '../hooks/useChallenges';
 import { useRealtime } from '../hooks/useRealtime';
+import ScreenHeader from '../components/common/ScreenHeader';
 import { calculateXPEarned, calculateCoinsEarned } from '../utils/gamification';
 
 const { width } = Dimensions.get('window');
@@ -173,14 +174,21 @@ const Timer = ({ navigation, route }) => {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
       
-      {/* Timer Header */}
-      <View style={[styles.header, { backgroundColor: theme.colors.primary }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()}><Icon name="arrow-left" size={24} color="#FFF" /></TouchableOpacity>
-        <Text style={styles.headerTitle}>Study Timer</Text>
-        <TouchableOpacity onPress={() => setShowChallengeModal(true)}><Icon name="target" size={24} color="#FFF" /></TouchableOpacity>
-      </View>
+      <ScreenHeader 
+        title="Study Timer" 
+        onBack={() => navigation.goBack()} 
+        theme={theme}
+        rightElement={
+          <TouchableOpacity onPress={() => setShowChallengeModal(true)}>
+            <Icon name="target" size={24} color="#FFF" />
+          </TouchableOpacity>
+        }
+      />
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.scrollContent}
+      >
         {/* Modes Toggle */}
         <View style={styles.modesContainer}>
           {Object.keys(timerConfigs).map(mode => (

@@ -18,14 +18,19 @@ const DailyChallengeCard = ({ challenge, onClaim, theme }) => {
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Daily Challenge</Text>
         <TouchableOpacity 
-          onPress={challenge.is_completed ? null : onClaim}
-          disabled={challenge.is_completed}
+          onPress={challenge.is_completed || currentVal < targetVal ? null : onClaim}
+          disabled={challenge.is_completed || currentVal < targetVal}
+          style={[
+            styles.claimButton, 
+            challenge.is_completed ? styles.disabledBtn : 
+            currentVal >= targetVal ? styles.activeBtn : styles.hiddenBtn
+          ]}
         >
           <Text style={[
-            styles.seeAllText,
-            { color: challenge.is_completed ? theme.colors.disabled : theme.colors.primary }
+            styles.claimText,
+            { color: '#FFF' }
           ]}>
-            {challenge.is_completed ? 'Claimed' : 'Claim'}
+            {challenge.is_completed ? 'CLAIMED ✓' : currentVal >= targetVal ? 'CLAIM REWARDS' : 'IN PROGRESS'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -133,6 +138,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     marginLeft: 4,
+  },
+  claimButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  activeBtn: {
+    backgroundColor: '#34C759', // Success green
+  },
+  disabledBtn: {
+    backgroundColor: '#8E8E93', // Neutral gray
+  },
+  hiddenBtn: {
+    backgroundColor: '#FF9500', // Warning orange for "In Progress"
+  },
+  claimText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
 });
 

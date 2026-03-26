@@ -1,4 +1,4 @@
-// src/screens/Login.js (COMPLETELY FIXED)
+// src/screens/Login.js (COMPLETELY FIXED - SCROLLABLE VERSION)
 import React, { useState } from 'react';
 import {
   View,
@@ -11,6 +11,8 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { supabase } from '../services/supabase';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -21,6 +23,7 @@ export default function Login({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [secureTextEntry, setSecureTextEntry] = useState(true);
+  const passwordInput = React.useRef(null);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -90,7 +93,7 @@ export default function Login({ navigation }) {
           redirectTo: 'studyapp://reset-password',
         }
       );
-      
+
       if (error) {
         Alert.alert('Error', 'Failed to send password reset email');
       } else {
@@ -114,134 +117,148 @@ export default function Login({ navigation }) {
     setSecureTextEntry(!secureTextEntry);
   };
 
+  const KeyboardWrapper = Platform.OS === 'web' ? View : KeyboardAvoidingView;
+
   return (
-    <KeyboardAvoidingView
+    <KeyboardWrapper
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+      style={[styles.container, { flex: 1 }]}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        style={{ flex: 1 }}
+        contentContainerStyle={[styles.scrollContent, { flexGrow: 1 }]}
+        showsVerticalScrollIndicator={true}
+        persistentScrollbar={true}
+        keyboardShouldPersistTaps="handled"
+        alwaysBounceVertical={true}
+        bounces={true}
+        nestedScrollEnabled={true}
       >
-        <View style={styles.content}>
-          {/* Header Section */}
-          <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Icon name="brain" size={60} color="#4A90E2" />
-            </View>
-            <Text style={styles.title}>Study Challenge</Text>
-            <Text style={styles.subtitle}>Unlock your potential through focused learning</Text>
-          </View>
-
-          {/* Error Message */}
-          {error ? (
-            <View style={styles.errorContainer}>
-              <Icon name="alert-circle" size={20} color="#D32F2F" />
-              <Text style={styles.error}>{error}</Text>
-            </View>
-          ) : null}
-
-          {/* Login Form */}
-          <View style={styles.formContainer}>
-            <Text style={styles.formTitle}>Welcome Back</Text>
-            <Text style={styles.formSubtitle}>Sign in to continue your journey</Text>
-
-            {/* Email Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email Address</Text>
-              <View style={styles.inputWrapper}>
-                <Icon name="email-outline" size={20} color="#666" style={styles.inputIcon} />
-                <TextInput
-                  placeholder="you@example.com"
-                  value={email}
-                  onChangeText={setEmail}
-                  style={styles.input}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  autoCorrect={false}
-                  editable={!loading}
-                  returnKeyType="next"
-                />
+            <View style={styles.content}>
+              {/* Header Section */}
+              <View style={styles.header}>
+                <View style={styles.logoContainer}>
+                  <Icon name="brain" size={60} color="#4A90E2" />
+                </View>
+                <Text style={styles.title}>Study Challenge</Text>
+                <Text style={styles.subtitle}>Unlock your potential through focused learning</Text>
               </View>
-            </View>
 
-            {/* Password Input */}
-            <View style={styles.inputContainer}>
-              <View style={styles.labelRow}>
-                <Text style={styles.label}>Password</Text>
-                <TouchableOpacity onPress={handleForgotPassword}>
-                  <Text style={styles.forgotPasswordLabel}>Forgot Password?</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.inputWrapper}>
-                <Icon name="lock-outline" size={20} color="#666" style={styles.inputIcon} />
-                <TextInput
-                  placeholder="Enter your password"
-                  value={password}
-                  onChangeText={setPassword}
-                  style={[styles.input, styles.passwordInput]}
-                  secureTextEntry={secureTextEntry}
-                  editable={!loading}
-                  returnKeyType="go"
-                  onSubmitEditing={handleLogin}
-                />
+              {/* Error Message */}
+              {error ? (
+                <View style={styles.errorContainer}>
+                  <Icon name="alert-circle" size={20} color="#D32F2F" />
+                  <Text style={styles.error}>{error}</Text>
+                </View>
+              ) : null}
+
+              {/* Login Form */}
+              <View style={styles.formContainer}>
+                <Text style={styles.formTitle}>Welcome Back</Text>
+                <Text style={styles.formSubtitle}>Sign in to continue your journey</Text>
+
+                {/* Email Input */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Email Address</Text>
+                  <View style={styles.inputWrapper}>
+                    <Icon name="email-outline" size={20} color="#666" style={styles.inputIcon} />
+                    <TextInput
+                      placeholder="you@example.com"
+                      value={email}
+                      onChangeText={setEmail}
+                      style={styles.input}
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                      autoCorrect={false}
+                      editable={!loading}
+                      returnKeyType="next"
+                      blurOnSubmit={false}
+                      onSubmitEditing={() => {
+                        passwordInput.current?.focus();
+                      }}
+                    />
+                  </View>
+                </View>
+
+                {/* Password Input */}
+                <View style={styles.inputContainer}>
+                  <View style={styles.labelRow}>
+                    <Text style={styles.label}>Password</Text>
+                    <TouchableOpacity onPress={handleForgotPassword}>
+                      <Text style={styles.forgotPasswordLabel}>Forgot Password?</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.inputWrapper}>
+                    <Icon name="lock-outline" size={20} color="#666" style={styles.inputIcon} />
+                    <TextInput
+                      ref={passwordInput}
+                      placeholder="Enter your password"
+                      value={password}
+                      onChangeText={setPassword}
+                      style={[styles.input, styles.passwordInput]}
+                      secureTextEntry={secureTextEntry}
+                      editable={!loading}
+                      returnKeyType="go"
+                      onSubmitEditing={handleLogin}
+                    />
+                    <TouchableOpacity
+                      onPress={toggleSecureEntry}
+                      style={styles.eyeButton}
+                    >
+                      <Icon
+                        name={secureTextEntry ? "eye-outline" : "eye-off-outline"}
+                        size={20}
+                        color="#666"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Login Button */}
                 <TouchableOpacity
-                  onPress={toggleSecureEntry}
-                  style={styles.eyeButton}
+                  style={[styles.loginButton, loading && styles.disabledButton]}
+                  onPress={handleLogin}
+                  disabled={loading}
+                  activeOpacity={0.8}
                 >
-                  <Icon
-                    name={secureTextEntry ? "eye-outline" : "eye-off-outline"}
-                    size={20}
-                    color="#666"
-                  />
+                  {loading ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <>
+                      <Icon name="login" size={20} color="#FFF" style={styles.buttonIcon} />
+                      <Text style={styles.loginButtonText}>Sign In</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
+
+                {/* Divider */}
+                <View style={styles.dividerContainer}>
+                  <View style={styles.divider} />
+                  <Text style={styles.dividerText}>or</Text>
+                  <View style={styles.divider} />
+                </View>
+
+                {/* Sign Up Link */}
+                <View style={styles.signupContainer}>
+                  <Text style={styles.signupText}>Don't have an account?</Text>
+                  <TouchableOpacity onPress={handleSignUp} disabled={loading}>
+                    <Text style={styles.signupHighlight}> Create Account</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Footer */}
+              <View style={styles.footer}>
+                <Text style={styles.footerText}>
+                  By signing in, you agree to our{' '}
+                  <Text style={styles.footerLink}>Terms of Service</Text> and{' '}
+                  <Text style={styles.footerLink}>Privacy Policy</Text>
+                </Text>
               </View>
             </View>
-
-            {/* Login Button */}
-            <TouchableOpacity
-              style={[styles.loginButton, loading && styles.disabledButton]}
-              onPress={handleLogin}
-              disabled={loading}
-              activeOpacity={0.8}
-            >
-              {loading ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <>
-                  <Icon name="login" size={20} color="#FFF" style={styles.buttonIcon} />
-                  <Text style={styles.loginButtonText}>Sign In</Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            {/* Divider */}
-            <View style={styles.dividerContainer}>
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>or</Text>
-              <View style={styles.divider} />
-            </View>
-
-            {/* Sign Up Link */}
-            <View style={styles.signupContainer}>
-              <Text style={styles.signupText}>Don't have an account?</Text>
-              <TouchableOpacity onPress={handleSignUp} disabled={loading}>
-                <Text style={styles.signupHighlight}> Create Account</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Footer */}
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              By signing in, you agree to our{' '}
-              <Text style={styles.footerLink}>Terms of Service</Text> and{' '}
-              <Text style={styles.footerLink}>Privacy Policy</Text>
-            </Text>
-          </View>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          </ScrollView>
+    </KeyboardWrapper>
   );
 }
 
@@ -250,18 +267,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F7',
   },
+  keyboardView: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: 120, // Increased for better visibility of bottom elements
   },
   content: {
-    flex: 1,
     paddingHorizontal: 24,
-    paddingVertical: 40,
+    paddingTop: 10, // Reduced to move content up
   },
   header: {
     alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 40,
+    marginTop: 0, // Reduced to move content up
+    marginBottom: 20, // Reduced to move content up
   },
   logoContainer: {
     width: 80,
@@ -335,6 +355,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E5E5EA',
+    position: 'relative',
   },
   inputIcon: {
     marginLeft: 16,
@@ -431,6 +452,7 @@ const styles = StyleSheet.create({
   footer: {
     alignItems: 'center',
     paddingHorizontal: 20,
+    marginBottom: 20,
   },
   footerText: {
     fontSize: 12,

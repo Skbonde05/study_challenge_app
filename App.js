@@ -9,29 +9,54 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from './src/services/supabase';
 import { ThemeProvider, themes } from './src/context/ThemeContext';
 import { ToastProvider, useToast } from './src/context/ToastContext';
-import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query';
+import { useQueryClient, QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query';
 import { useRealtime } from './src/hooks/useRealtime';
+import { useAppTheme } from './src/theme/useAppTheme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { persistQueryClient } from '@tanstack/react-query-persist-client';
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
+import { getProfile } from './src/api/profile';
+import { getRecentSessions } from './src/api/sessions';
+import { getUserChallenges } from './src/api/challenges';
 
-// Global toast error handler configuration
-const createQueryClient = (showToast) => new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 2,
-      staleTime: 1000 * 60 * 5,
-      refetchOnWindowFocus: true,
+const createQueryClient = (showToast) => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: 2,
+        staleTime: 1000 * 60 * 10, // 10 minutes cache
+        gcTime: 1000 * 60 * 60 * 24, // 24 hours persistence
+        refetchOnWindowFocus: false,
+      },
     },
-  },
-  queryCache: new QueryCache({
-    onError: (error) => {
-      showToast(error.message || 'Failed to fetch data', 'error');
-    },
-  }),
-  mutationCache: new MutationCache({
-    onError: (error) => {
-      showToast(error.message || 'Operation failed', 'error');
-    },
-  }),
-});
+    queryCache: new QueryCache({
+      onError: (err) => {
+        if (!err.silent) {
+          showToast?.(err.message || 'Something went wrong', 'error');
+        }
+      },
+    }),
+  });
+
+  const asyncStoragePersister = createAsyncStoragePersister({
+    storage: AsyncStorage,
+    key: 'STREAKIFY_QUERY_CACHE',
+    throttleTime: 1000,
+  });
+
+  persistQueryClient({
+    queryClient,
+    persister: asyncStoragePersister,
+    maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+    hydrateOptions: {
+      shouldDehydrateQuery: (query) => {
+        return query.state.status === 'success';
+      }
+    }
+  });
+
+  return queryClient;
+};
 
 // Import all screens
 import SplashScreen from './src/screens/SplashScreen';
@@ -66,8 +91,11 @@ const MyTheme = {
   },
 };
 
+
 // Bottom Tab Navigator - Main app interface
 function MainTabNavigator() {
+  const { theme } = useAppTheme();
+  
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -86,19 +114,24 @@ function MainTabNavigator() {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#4A90E2',
-        tabBarInactiveTintColor: '#8E8E93',
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.secondaryText,
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
+          backgroundColor: theme.colors.card,
           borderTopWidth: 1,
-          borderTopColor: '#F0F0F0',
-          height: Platform.OS === 'ios' ? 85 : 60,
-          paddingBottom: Platform.OS === 'ios' ? 25 : 10,
+          borderTopColor: theme.colors.border,
+          height: Platform.OS === 'ios' ? 85 : 65,
+          paddingBottom: Platform.OS === 'ios' ? 25 : 12,
           paddingTop: 10,
+          elevation: 20,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 10,
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: '500',
+          fontWeight: '600',
         },
         headerShown: false, // Each screen has its own custom header
       })}
@@ -215,6 +248,7 @@ function AuthStackNavigator() {
 
 // Root Navigator that switches between Auth and App based on session
 function RootNavigator() {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState(themes.light);
@@ -230,15 +264,12 @@ function RootNavigator() {
         setSession(session);
       } catch (error) {
         console.error('Session check error:', error);
-      } finally {
-        setTimeout(() => {
-          setLoading(false);
-        }, 1500);
       }
     };
 
     checkSession();
 
+    // Inside RootNavigator (where session logic lives)
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -248,12 +279,31 @@ function RootNavigator() {
         // Load theme preferences for authenticated user
         if (session) {
           loadUserTheme(session.user.id);
+          // Prefetch essential data while splash/auth is processing
+          prefetchEssentialData(session);
+        } else {
+          // Clear all cached study data on logout for security and clean state
+          queryClient.clear();
         }
       }
     );
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const prefetchEssentialData = async (session) => {
+    if (!session?.user?.id) return;
+    
+    // Use the memoized queryClient
+    try {
+      // Prefetch critical data in parallel
+      queryClient.prefetchQuery({ queryKey: ['profile'], queryFn: () => getProfile(session.user.id) });
+      queryClient.prefetchQuery({ queryKey: ['recent-sessions'], queryFn: () => getRecentSessions(session.user.id) });
+      queryClient.prefetchQuery({ queryKey: ['challenges'], queryFn: () => getUserChallenges(session.user.id) });
+    } catch (e) {
+      console.warn('Prefetch failed:', e);
+    }
+  };
 
   const loadUserTheme = async (userId) => {
     try {
@@ -273,20 +323,37 @@ function RootNavigator() {
     }
   };
 
+  // Calculate effective navigation theme
+  const navTheme = {
+    ...DefaultTheme,
+    colors: {
+      ...DefaultTheme.colors,
+      background: theme.colors.background,
+      card: theme.colors.card,
+      text: theme.colors.text,
+      border: theme.colors.border,
+      primary: theme.colors.primary,
+    },
+  };
+
   return (
     <ThemeProvider theme={theme} setTheme={setTheme}>
-      <View style={{ flex: 1, backgroundColor: loading ? '#4A90E2' : theme.background }} key="root-container">
+      <View style={{ flex: 1, backgroundColor: loading ? '#0F172A' : theme.colors.background }}>
+        <StatusBar
+          barStyle={loading ? 'light-content' : (theme.mode === 'dark' ? 'light-content' : 'dark-content')}
+          backgroundColor={loading ? '#0F172A' : theme.colors.primary}
+        />
         {loading ? (
-          <View key="loading-view" style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <StatusBar barStyle="light-content" backgroundColor="#4A90E2" />
-            <SplashScreen />
-          </View>
+          <SplashScreen 
+            key="app-splash"
+            onComplete={(finalSession) => {
+              if (finalSession) setSession(finalSession);
+              // Defer unmounting to prevent DOM removal errors on Web
+              setTimeout(() => setLoading(false), 50);
+            }} 
+          />
         ) : (
-          <NavigationContainer theme={MyTheme} key="nav-container">
-            <StatusBar
-              barStyle={theme === themes.dark ? 'light-content' : 'dark-content'}
-              backgroundColor={theme.primary}
-            />
+          <NavigationContainer key="app-nav" theme={navTheme}>
             {session ? <AppStackNavigator /> : <AuthStackNavigator />}
           </NavigationContainer>
         )}

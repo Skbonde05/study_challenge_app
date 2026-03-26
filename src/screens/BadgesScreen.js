@@ -15,6 +15,7 @@ import { useAppTheme } from '../theme/useAppTheme';
 import { useBadges } from '../hooks/useBadges';
 import { useProfile } from '../hooks/useProfile';
 import { useRealtime } from '../hooks/useRealtime';
+import ScreenHeader from '../components/common/ScreenHeader';
 
 const BadgesScreen = ({ navigation }) => {
   const { theme } = useAppTheme();
@@ -109,25 +110,32 @@ const BadgesScreen = ({ navigation }) => {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
       
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.colors.primary }]}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity onPress={() => navigation.goBack()}><Icon name="arrow-left" size={24} color="#FFF" /></TouchableOpacity>
-          <Text style={styles.headerTitle}>Achievements</Text>
-          <View style={{ width: 24 }} />
-        </View>
+      <ScreenHeader 
+        title="Achievements" 
+        onBack={() => navigation.goBack()} 
+        theme={theme}
+      />
 
-        {/* Stats Row */}
+      <View style={[styles.statsHeader, { backgroundColor: theme.colors.card }]}>
         <View style={styles.statsRow}>
-          <View style={styles.statItem}><Text style={styles.statVal}>{stats.earnedCount}</Text><Text style={styles.statLabel}>EARNED</Text></View>
+          <View style={styles.statItem}>
+            <Text style={[styles.statVal, { color: theme.colors.text }]}>{stats.earnedCount}</Text>
+            <Text style={styles.statLabel}>EARNED</Text>
+          </View>
           <View style={styles.statDivider} />
-          <View style={styles.statItem}><Text style={styles.statVal}>{stats.legendaryCount}</Text><Text style={[styles.statLabel, { color: '#FFD700' }]}>LEGENDARY</Text></View>
+          <View style={styles.statItem}>
+            <Text style={[styles.statVal, { color: '#FFD700' }]}>{stats.legendaryCount}</Text>
+            <Text style={[styles.statLabel, { color: '#FFD700' }]}>LEGENDARY</Text>
+          </View>
           <View style={styles.statDivider} />
-          <View style={styles.statItem}><Text style={styles.statVal}>{stats.percentage}%</Text><Text style={styles.statLabel}>COMPLETE</Text></View>
+          <View style={styles.statItem}>
+            <Text style={[styles.statVal, { color: theme.colors.primary }]}>{stats.percentage}%</Text>
+            <Text style={styles.statLabel}>COMPLETE</Text>
+          </View>
         </View>
       </View>
 
-      <View style={styles.categoryBox}>
+      <View style={[styles.categoryBox, { backgroundColor: theme.colors.card }]}>
         <FlatList 
           horizontal showsHorizontalScrollIndicator={false}
           data={categories}
@@ -158,15 +166,25 @@ const BadgesScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { padding: 16, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, elevation: 8 },
-  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  headerTitle: { color: '#FFF', fontSize: 20, fontWeight: 'bold' },
-  statsRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20, marginBottom: 10 },
+  statsHeader: {
+    paddingTop: 16,
+    paddingBottom: 24,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    marginTop: -20,
+    zIndex: 5,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  statsRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20, paddingHorizontal: 20 },
   statItem: { alignItems: 'center', flex: 1 },
-  statVal: { color: '#FFF', fontSize: 22, fontWeight: 'bold' },
-  statLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: 'bold' },
-  statDivider: { width: 1, height: 30, backgroundColor: 'rgba(255,255,255,0.2)' },
-  categoryBox: { paddingVertical: 16 },
+  statVal: { fontSize: 22, fontWeight: 'bold' },
+  statLabel: { color: '#8E8E93', fontSize: 10, fontWeight: 'bold', marginTop: 4 },
+  statDivider: { width: 1, height: 30, backgroundColor: 'rgba(0,0,0,0.05)' },
+  categoryBox: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.02)' },
   catBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, marginLeft: 16, borderImplicit: 1, borderColor: 'rgba(0,0,0,0.05)' },
   catText: { fontSize: 13, fontWeight: 'bold' },
   listContent: { padding: 16, paddingBottom: 40 },

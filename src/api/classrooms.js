@@ -5,49 +5,55 @@ import { supabase } from '../services/supabase';
  * @param {string} userId
  */
 export const getUserClassrooms = async (userId) => {
-  // 1. Get classroom memberships for the user
-  const { data: memberships, error: membershipError } = await supabase
-    .from('classroom_members')
-    .select('classroom_id, role')
-    .eq('user_id', userId);
-
-  if (membershipError) throw membershipError;
-  if (!memberships || memberships.length === 0) return [];
-
-  // 2. Fetch classroom details and creator profile for each membership
-  const classrooms = await Promise.all(memberships.map(async (m) => {
-    // Get classroom basic info
-    const { data: classroom, error: classroomError } = await supabase
-      .from('classrooms')
-      .select('*')
-      .eq('id', m.classroom_id)
-      .single();
-
-    if (classroomError || !classroom) return null;
-
-    // Get creator profile
-    const { data: creator } = await supabase
-      .from('profiles')
-      .select('username, avatar_url')
-      .eq('id', classroom.created_by)
-      .single();
-
-    // Get member count for this classroom
-    const { count } = await supabase
+  try {
+    const { data: memberships, error: membershipError } = await supabase
       .from('classroom_members')
-      .select('*', { count: 'exact', head: true })
-      .eq('classroom_id', classroom.id);
+      .select('classroom_id, role')
+      .eq('user_id', userId);
 
-    return {
-      ...classroom,
-      user_role: m.role,
-      is_member: true,
-      member_count: count || 0,
-      creator: creator || { username: 'Unknown' }
-    };
-  }));
+    if (membershipError) throw membershipError;
+    if (!memberships || memberships.length === 0) return [];
+    
+    // Continue with details fetch (moved from line 18)
+    const classrooms = await Promise.all(memberships.map(async (m) => {
+      try {
+        const { data: classroom, error: classroomError } = await supabase
+          .from('classrooms')
+          .select('*')
+          .eq('id', m.classroom_id)
+          .single();
 
-  return classrooms.filter(c => c !== null);
+        if (classroomError || !classroom) return null;
+
+        const { data: creator } = await supabase
+          .from('profiles')
+          .select('username, avatar_url')
+          .eq('id', classroom.created_by)
+          .single();
+
+        const { count } = await supabase
+          .from('classroom_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('classroom_id', classroom.id);
+
+        return {
+          ...classroom,
+          user_role: m.role,
+          is_member: true,
+          member_count: count || 0,
+          creator: creator || { username: 'Teacher' }
+        };
+      } catch (err) {
+        return null;
+      }
+    }));
+
+    return classrooms.filter(c => c !== null);
+
+  } catch (err) {
+    console.warn('Classroom hub fetch error (maybe table missing?):', err.message);
+    return [];
+  }
 };
 
 /**
@@ -55,46 +61,53 @@ export const getUserClassrooms = async (userId) => {
  * @param {string} userId - to check if already a member
  */
 export const getExploreClassrooms = async (userId) => {
-  const { data: classrooms, error } = await supabase
-    .from('classrooms')
-    .select('*')
-    .eq('is_public', true)
-    .limit(20);
+  try {
+    const { data: classrooms, error } = await supabase
+      .from('classrooms')
+      .select('*')
+      .eq('is_public', true)
+      .limit(20);
 
-  if (error) throw error;
+    if (error) throw error;
+    if (!classrooms) return [];
 
-  const results = await Promise.all(classrooms.map(async (c) => {
-    // Check membership
-    const { data: membership } = await supabase
-      .from('classroom_members')
-      .select('role')
-      .eq('classroom_id', c.id)
-      .eq('user_id', userId)
-      .maybeSingle();
+    const results = await Promise.all(classrooms.map(async (c) => {
+      try {
+        const { data: membership } = await supabase
+          .from('classroom_members')
+          .select('role')
+          .eq('classroom_id', c.id)
+          .eq('user_id', userId)
+          .maybeSingle();
 
-    // Get member count
-    const { count } = await supabase
-      .from('classroom_members')
-      .select('*', { count: 'exact', head: true })
-      .eq('classroom_id', c.id);
+        const { count } = await supabase
+          .from('classroom_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('classroom_id', c.id);
 
-    // Get creator details
-    const { data: creator } = await supabase
-      .from('profiles')
-      .select('username, avatar_url')
-      .eq('id', c.created_by)
-      .single();
+        const { data: creator } = await supabase
+          .from('profiles')
+          .select('username, avatar_url')
+          .eq('id', c.created_by)
+          .single();
 
-    return {
-      ...c,
-      is_member: !!membership,
-      user_role: membership?.role || null,
-      member_count: count || 0,
-      creator: creator || { username: 'Unknown' }
-    };
-  }));
+        return {
+          ...c,
+          is_member: !!membership,
+          user_role: membership?.role || null,
+          member_count: count || 0,
+          creator: creator || { username: 'Teacher' }
+        };
+      } catch (err) {
+        return { ...c, creator: { username: 'Teacher' }, member_count: 0 };
+      }
+    }));
 
-  return results;
+    return results || [];
+  } catch (err) {
+    console.warn('Explore classrooms fetch error:', err.message);
+    return [];
+  }
 };
 
 /**

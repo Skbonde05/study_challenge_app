@@ -41,14 +41,16 @@ export const useTheme = () => {
   return context;
 };
 
-export const ThemeProvider = ({ children }) => {
-  const [theme, setThemeState] = useState(themes.light);
+export const ThemeProvider = ({ children, theme: propTheme, setTheme: propSetTheme }) => {
+  const [internalTheme, setInternalTheme] = useState(themes.light);
 
+  const theme = propTheme || internalTheme;
+  
   const setTheme = (mode) => {
-    if (mode === 'dark') {
-      setThemeState(themes.dark);
+    if (propSetTheme) {
+      propSetTheme(mode === 'dark' ? themes.dark : themes.light);
     } else {
-      setThemeState(themes.light);
+      setInternalTheme(mode === 'dark' ? themes.dark : themes.light);
     }
   };
 

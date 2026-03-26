@@ -23,6 +23,7 @@ import { useAppTheme } from '../theme/useAppTheme';
 import { useProfile } from '../hooks/useProfile';
 import { useSessions } from '../hooks/useSessions';
 import { useRealtime } from '../hooks/useRealtime';
+import ScreenHeader from '../components/common/ScreenHeader';
 
 const { width } = Dimensions.get('window');
 
@@ -187,17 +188,28 @@ export default function Profile({ navigation }) {
   };
 
   const handleLogout = async () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      { 
-        text: 'Logout', 
-        style: 'destructive',
-        onPress: async () => {
-          await supabase.auth.signOut();
-          navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
-        }
-      },
-    ]);
+    const performLogout = async () => {
+      try {
+        await supabase.auth.signOut();
+        await AsyncStorage.clear();
+      } catch (err) {
+        console.error("Logout failed:", err);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Are you sure you want to logout?');
+      if (confirmed) performLogout();
+    } else {
+      Alert.alert('Logout', 'Are you sure you want to logout?', [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Logout', 
+          style: 'destructive',
+          onPress: performLogout
+        },
+      ]);
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -219,34 +231,15 @@ export default function Profile({ navigation }) {
     ]);
   };
 
-  // Profile Header Component
-  const ProfileHeader = () => (
-    <View style={[styles.fixedHeader, { backgroundColor: theme.colors.primary }]}>
-      <View style={styles.customHeader}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Icon name="arrow-left" size={24} color={theme.colors.headerText} />
-          </TouchableOpacity>
-          <View style={styles.titleContainer}>
-            <Text style={[styles.headerTitle, { color: theme.colors.headerText }]}>My Profile</Text>
-            <Text style={[styles.headerSubtitle, { color: theme.colors.headerText + '99' }]}>Manage your account</Text>
-          </View>
-        </View>
-        
-        <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.settingsButton} onPress={() => navigation.navigate('Settings')}>
-            <Icon name="cog-outline" size={24} color={theme.colors.headerText} />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
-
   if (loading) {
     return (
-      <SafeAreaView style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
-        <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={theme.colors.primary} />
-        <ProfileHeader />
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
+        <ScreenHeader 
+          title="My Profile" 
+          onBack={() => navigation.goBack()} 
+          theme={theme}
+        />
         <View style={styles.loadingContent}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={[styles.loadingText, { color: theme.colors.secondaryText }]}>Loading your profile...</Text>
@@ -257,12 +250,20 @@ export default function Profile({ navigation }) {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={theme.colors.primary} />
-      
-      <ProfileHeader />
+      <ScreenHeader 
+        title="My Profile" 
+        onBack={() => navigation.goBack()} 
+        theme={theme}
+        rightElement={
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={{ padding: 8 }}>
+            <Icon name="cog-outline" size={26} color="#FFF" />
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView 
-        showsVerticalScrollIndicator={false}
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={true}
         refreshControl={
           <RefreshControl
             refreshing={false}
@@ -271,7 +272,7 @@ export default function Profile({ navigation }) {
             tintColor={theme.colors.primary}
           />
         }
-        contentContainerStyle={[styles.scrollContent, { paddingTop: 100 }]}
+        contentContainerStyle={[styles.scrollContent, { flexGrow: 1, paddingTop: 100, paddingBottom: 120 }]}
       >
         {/* Profile Overview Card */}
         <View style={[styles.profileOverview, { backgroundColor: theme.colors.primary }]}>
@@ -294,20 +295,31 @@ export default function Profile({ navigation }) {
                 {profile?.full_name || profile?.username || 'User'}
               </Text>
               <Text style={[styles.profileUsername, { color: theme.colors.headerText + 'CC' }]}>@{profile?.username || 'username'}</Text>
-              <View style={[styles.rankBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                <Icon name="crown" size={14} color="#FFD700" />
-                <Text style={[styles.rankText, { color: theme.colors.headerText }]}>{userRank}</Text>
+              <View style={styles.rankAndEditRow}>
+                <View style={[styles.rankBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                  <Icon name="crown" size={14} color="#FFD700" />
+                  <Text style={[styles.rankText, { color: theme.colors.headerText }]}>{userRank}</Text>
+                  <Icon name="medal" size={12} color="#FFF" />
+                  <Text style={styles.rankText}>LEVEL {currentLevel}</Text>
+                </View>
+
+                <TouchableOpacity 
+                  onPress={() => setEditing(true)}
+                  style={styles.headerEditBtn}
+                >
+                  <Icon name="pencil" size={12} color="#FFF" />
+                  <Text style={styles.headerEditBtnText}>Edit Profile</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
 
-          {profile?.bio && (
-            <View style={[styles.bioContainer, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-              <Icon name="format-quote-open" size={14} color={theme.colors.headerText + 'B3'} />
-              <Text style={[styles.profileBio, { color: theme.colors.headerText }]}>{profile.bio}</Text>
-              <Icon name="format-quote-close" size={14} color={theme.colors.headerText + 'B3'} style={{ alignSelf: 'flex-end' }} />
+          {profile?.bio ? (
+            <View style={[styles.bioContainer, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
+              <Icon name="format-quote-open" size={16} color="rgba(255,255,255,0.6)" />
+              <Text style={[styles.profileBio, { color: '#FFF' }]}>{profile.bio}</Text>
             </View>
-          )}
+          ) : null}
         </View>
 
         {/* Stats Grid */}
@@ -408,13 +420,6 @@ export default function Profile({ navigation }) {
 
         {/* Account Actions */}
         <View style={styles.actionsSection}>
-          <TouchableOpacity 
-            style={[styles.actionButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.primary }]}
-            onPress={() => setEditing(true)}
-          >
-            <Icon name="pencil" size={20} color={theme.colors.primary} />
-            <Text style={[styles.actionText, { color: theme.colors.primary }]}>Edit Profile</Text>
-          </TouchableOpacity>
 
           <TouchableOpacity 
             style={[styles.actionButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.error }]}
@@ -508,6 +513,9 @@ const styles = StyleSheet.create({
   avatarSection: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   avatarContainer: { position: 'relative', marginRight: 16 },
   avatar: { width: 80, height: 80, borderRadius: 40, borderWidth: 3, borderColor: '#FFF' },
+  rankAndEditRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 8 },
+  headerEditBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  headerEditBtnText: { color: '#FFF', fontSize: 12, fontWeight: 'bold', marginLeft: 4 },
   avatarPlaceholder: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   avatarUploading: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
   cameraIcon: { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderWidth: 2 },

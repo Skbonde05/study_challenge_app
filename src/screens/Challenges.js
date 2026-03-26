@@ -17,6 +17,7 @@ import { useAppTheme } from '../theme/useAppTheme';
 import { useChallenges } from '../hooks/useChallenges';
 import { useProfile } from '../hooks/useProfile';
 import { useRealtime } from '../hooks/useRealtime';
+import ScreenHeader from '../components/common/ScreenHeader';
 
 const { width } = Dimensions.get('window');
 
@@ -152,17 +153,15 @@ export default function Challenges({ navigation }) {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
       
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-left" size={24} color={theme.colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Challenges</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <ScreenHeader 
+        title="Study Challenges" 
+        onBack={() => navigation.goBack()} 
+        theme={theme} 
+      />
 
       <ScrollView 
-        contentContainerStyle={styles.content}
+        style={{ flex: 1 }}
+        contentContainerStyle={[styles.content, { flexGrow: 1, paddingBottom: 100 }]}
         refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} colors={[theme.colors.primary]} />}
       >
         {/* Daily Challenge Card - Featured */}

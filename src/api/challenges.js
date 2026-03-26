@@ -125,12 +125,22 @@ export const completeChallenge = async (userId, ucId, currentCoins, currentXp, c
 
   if (ucError) throw ucError;
 
+  // Get current completed challenges for manual increment
+  const { data: profileObj, error: fetchErr } = await supabase
+    .from('profiles')
+    .select('completed_challenges')
+    .eq('id', userId)
+    .single();
+
+  if (fetchErr) throw fetchErr;
+
   const { error: profileError } = await supabase
     .from('profiles')
     .update({
       coins: (currentCoins || 0) + coinReward,
       xp: (currentXp || 0) + xpReward,
-      completed_challenges: supabase.rpc('increment_completed_challenges'), // Assuming rpc or manual
+      completed_challenges: (profileObj.completed_challenges || 0) + 1,
+      updated_at: new Date().toISOString(),
     })
     .eq('id', userId);
 

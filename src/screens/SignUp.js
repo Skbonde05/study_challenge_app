@@ -67,7 +67,6 @@ export default function SignUp({ navigation }) {
     setErrors({});
 
     try {
-      // Sign up WITHOUT auto sign-in
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
@@ -76,7 +75,6 @@ export default function SignUp({ navigation }) {
             full_name: fullName.trim(),
             username: username.trim().toLowerCase(),
           },
-          // DO NOT auto confirm - require email verification
         },
       });
 
@@ -85,307 +83,162 @@ export default function SignUp({ navigation }) {
           Alert.alert(
             'Account Exists',
             'This email is already registered. Please login instead.',
-            [
-              {
-                text: 'Go to Login',
-                onPress: () => navigation.replace('Login')
-              }
-            ]
+            [{ text: 'Go to Login', onPress: () => navigation.replace('Login') }]
           );
-        } else if (authError.message.includes('password')) {
-          setErrors({ password: 'Password is too weak. Use at least 6 characters.' });
         } else {
           Alert.alert('Signup Error', authError.message);
         }
         return;
       }
 
-      // Create profile in profiles table
       if (authData?.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              id: authData.user.id,
-              email: email.trim().toLowerCase(),
-              username: username.trim().toLowerCase(),
-              full_name: fullName.trim(),
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-          ]);
-
-        if (profileError) {
-          console.warn('Profile creation warning:', profileError.message);
-          // Continue anyway - profile might be created via trigger
-        }
-
-        // Show success message
         Alert.alert(
           'Success! 🎉',
-          'Account created successfully!\n\nPlease check your email to verify your account before logging in.',
-          [
-            {
-              text: 'Go to Login',
-              onPress: () => {
-                // Go back to Login screen
-                navigation.replace('Login');
-              }
-            }
-          ]
+          'Account created successfully!\n\nPlease check your email to verify your account.',
+          [{ text: 'Go to Login', onPress: () => navigation.replace('Login') }]
         );
-
-        // Clear form
-        setFullName('');
-        setUsername('');
-        setEmail('');
-        setPassword('');
-        setConfirmPassword('');
       }
     } catch (error) {
       console.error('Signup error:', error);
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      Alert.alert('Error', 'An unexpected error occurred.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoBack = () => {
-    navigation.goBack();
-  };
+  const handleGoBack = () => navigation.goBack();
+
+  const KeyboardWrapper = Platform.OS === 'web' ? View : KeyboardAvoidingView;
 
   return (
-    <KeyboardAvoidingView
+    <KeyboardWrapper
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+      style={[styles.container, { flex: 1 }]}
     >
       <ScrollView 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        style={{ flex: 1 }}
+        contentContainerStyle={[styles.scrollContent, { flexGrow: 1 }]}
+        showsVerticalScrollIndicator={true}
+        persistentScrollbar={true}
+        keyboardShouldPersistTaps="handled"
+        alwaysBounceVertical={true}
+        bounces={true}
+        nestedScrollEnabled={true}
       >
-        {/* Custom Header with Back Button */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={handleGoBack}
-          >
-            <Icon name="arrow-left" size={24} color="#4A90E2" />
-            <Text style={styles.backText}>Back</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
+              <Icon name="arrow-left" size={24} color="#4A90E2" />
+              <Text style={styles.backText}>Back</Text>
+            </TouchableOpacity>
+          </View>
 
-        <View style={styles.content}>
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join Study Challenge today!</Text>
+          <View style={styles.content}>
+            <Text style={styles.title}>Create Account</Text>
+            <Text style={styles.subtitle}>Join Study Challenge today!</Text>
 
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Full Name *</Text>
-              <TextInput
-                placeholder="John Doe"
-                value={fullName}
-                onChangeText={setFullName}
-                style={[
-                  styles.input,
-                  errors.fullName && styles.inputError
-                ]}
-                editable={!loading}
+            <View style={styles.form}>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Full Name *</Text>
+                <TextInput
+                  placeholder="John Doe"
+                  value={fullName}
+                  onChangeText={setFullName}
+                  style={[styles.input, errors.fullName && styles.inputError]}
+                  editable={!loading}
+                />
+                {errors.fullName && <Text style={styles.errorText}>{errors.fullName}</Text>}
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Username *</Text>
+                <TextInput
+                  placeholder="johndoe"
+                  value={username}
+                  onChangeText={setUsername}
+                  style={[styles.input, errors.username && styles.inputError]}
+                  autoCapitalize="none"
+                  editable={!loading}
+                />
+                {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Email *</Text>
+                <TextInput
+                  placeholder="you@example.com"
+                  value={email}
+                  onChangeText={setEmail}
+                  style={[styles.input, errors.email && styles.inputError]}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  editable={!loading}
+                />
+                {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Password *</Text>
+                <TextInput
+                  placeholder="At least 6 characters"
+                  value={password}
+                  onChangeText={setPassword}
+                  style={[styles.input, errors.password && styles.inputError]}
+                  secureTextEntry
+                  editable={!loading}
+                />
+                {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Confirm Password *</Text>
+                <TextInput
+                  placeholder="Confirm your password"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  style={[styles.input, errors.confirmPassword && styles.inputError]}
+                  secureTextEntry
+                  editable={!loading}
+                />
+                {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
+              </View>
+
+              <AppButton
+                title={loading ? 'Creating Account...' : 'Create Account'}
+                onPress={handleSignUp}
+                disabled={loading}
+                style={styles.signupButton}
               />
-              {errors.fullName && (
-                <Text style={styles.errorText}>{errors.fullName}</Text>
-              )}
-            </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Username *</Text>
-              <TextInput
-                placeholder="johndoe"
-                value={username}
-                onChangeText={setUsername}
-                style={[
-                  styles.input,
-                  errors.username && styles.inputError
-                ]}
-                autoCapitalize="none"
-                editable={!loading}
-              />
-              {errors.username && (
-                <Text style={styles.errorText}>{errors.username}</Text>
-              )}
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email *</Text>
-              <TextInput
-                placeholder="you@example.com"
-                value={email}
-                onChangeText={setEmail}
-                style={[
-                  styles.input,
-                  errors.email && styles.inputError
-                ]}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                editable={!loading}
-              />
-              {errors.email && (
-                <Text style={styles.errorText}>{errors.email}</Text>
-              )}
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Password *</Text>
-              <TextInput
-                placeholder="At least 6 characters"
-                value={password}
-                onChangeText={setPassword}
-                style={[
-                  styles.input,
-                  errors.password && styles.inputError
-                ]}
-                secureTextEntry
-                editable={!loading}
-              />
-              {errors.password && (
-                <Text style={styles.errorText}>{errors.password}</Text>
-              )}
-              <Text style={styles.passwordHint}>
-                Must be at least 6 characters
-              </Text>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Confirm Password *</Text>
-              <TextInput
-                placeholder="Confirm your password"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                style={[
-                  styles.input,
-                  errors.confirmPassword && styles.inputError
-                ]}
-                secureTextEntry
-                editable={!loading}
-              />
-              {errors.confirmPassword && (
-                <Text style={styles.errorText}>{errors.confirmPassword}</Text>
-              )}
-            </View>
-
-            <AppButton
-              title={loading ? 'Creating Account...' : 'Create Account'}
-              onPress={handleSignUp}
-              disabled={loading}
-              style={styles.signupButton}
-            />
-
-            <View style={styles.loginContainer}>
-              <Text style={styles.loginText}>Already have an account?</Text>
-              <TouchableOpacity onPress={handleGoBack} disabled={loading}>
-                <Text style={styles.loginLink}> Login</Text>
-              </TouchableOpacity>
+              <View style={styles.loginContainer}>
+                <Text style={styles.loginText}>Already have an account?</Text>
+                <TouchableOpacity onPress={handleGoBack} disabled={loading}>
+                  <Text style={styles.loginLink}> Login</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 40,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  backText: {
-    fontSize: 16,
-    color: '#4A90E2',
-    marginLeft: 8,
-    fontWeight: '500',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#4A90E2',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 32,
-  },
-  form: {
-    width: '100%',
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-  },
-  inputError: {
-    borderColor: '#FF3B30',
-    backgroundColor: '#FFEBEE',
-  },
-  errorText: {
-    color: '#FF3B30',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  passwordHint: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
-  signupButton: {
-    marginTop: 8,
-    marginBottom: 20,
-    height: 52,
-  },
-  loginContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loginText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  loginLink: {
-    fontSize: 14,
-    color: '#4A90E2',
-    fontWeight: '600',
-  },
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  scrollContent: { flexGrow: 1, paddingBottom: 140 },
+  header: { paddingHorizontal: 16, paddingTop: 10 },
+  backButton: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
+  backText: { fontSize: 16, color: '#4A90E2', marginLeft: 8, fontWeight: '500' },
+  content: { paddingHorizontal: 24, paddingBottom: 40 },
+  title: { fontSize: 32, fontWeight: 'bold', color: '#4A90E2', textAlign: 'center', marginBottom: 8 },
+  subtitle: { fontSize: 16, color: '#666', textAlign: 'center', marginBottom: 32 },
+  form: { width: '100%' },
+  inputContainer: { marginBottom: 20 },
+  label: { fontSize: 14, fontWeight: '500', color: '#333', marginBottom: 8 },
+  input: { backgroundColor: 'white', borderWidth: 1, borderColor: '#ddd', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16 },
+  inputError: { borderColor: '#FF3B30', backgroundColor: '#FFEBEE' },
+  errorText: { color: '#FF3B30', fontSize: 12, marginTop: 4 },
+  signupButton: { marginTop: 8, marginBottom: 20, height: 52 },
+  loginContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  loginText: { fontSize: 14, color: '#666' },
+  loginLink: { fontSize: 14, color: '#4A90E2', fontWeight: '600' },
 });
