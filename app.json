@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "study-challenge",
+    "name": "Study Challenge",
     "slug": "study-challenge",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#4A90E2"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -27,7 +27,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#4A90E2"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
@@ -43,7 +43,14 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-image-picker"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app needs access to your photos to set profile pictures.",
+          "cameraPermission": "The app needs access to your camera to take profile pictures."
+        }
+      ]
     ],
     "extra": {
       "eas": {

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { supabase } from '../services/supabase';
 import AppButton from '../components/AppButton';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 export default function SignUp({ navigation }) {
   const [fullName, setFullName] = useState('');
@@ -21,89 +22,136 @@ export default function SignUp({ navigation }) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [errors, setErrors] = useState({});
 
   const validateForm = () => {
-    if (!fullName || !username || !email || !password || !confirmPassword) {
-      setError('Please fill in all fields');
-      return false;
+    const newErrors = {};
+
+    if (!fullName.trim()) {
+      newErrors.fullName = 'Full name is required';
     }
 
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return false;
+    if (!username.trim()) {
+      newErrors.username = 'Username is required';
+    } else if (username.length < 3) {
+      newErrors.username = 'Username must be at least 3 characters';
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return false;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!emailRegex.test(email.trim())) {
+      newErrors.email = 'Please enter a valid email';
     }
 
-    if (username.length < 3) {
-      setError('Username must be at least 3 characters');
-      return false;
+    if (!password) {
+      newErrors.password = 'Password is required';
+    } else if (password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
     }
 
-    return true;
+    if (!confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSignUp = async () => {
     if (!validateForm()) return;
 
     setLoading(true);
-    setError('');
-    setSuccess('');
+    setErrors({});
 
     try {
-      // Create auth user
+      // Sign up WITHOUT auto sign-in
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         password,
         options: {
           data: {
-            full_name: fullName,
-            username: username.toLowerCase(),
-          }
-        }
+            full_name: fullName.trim(),
+            username: username.trim().toLowerCase(),
+          },
+          // DO NOT auto confirm - require email verification
+        },
       });
 
       if (authError) {
         if (authError.message.includes('already registered')) {
-          setError('This email is already registered. Please login.');
+          Alert.alert(
+            'Account Exists',
+            'This email is already registered. Please login instead.',
+            [
+              {
+                text: 'Go to Login',
+                onPress: () => navigation.replace('Login')
+              }
+            ]
+          );
         } else if (authError.message.includes('password')) {
-          setError('Password is too weak. Use at least 6 characters.');
+          setErrors({ password: 'Password is too weak. Use at least 6 characters.' });
         } else {
-          setError(authError.message);
+          Alert.alert('Signup Error', authError.message);
         }
         return;
       }
 
-      if (!authData.user) {
-        setError('Signup failed. Please try again.');
-        return;
+      // Create profile in profiles table
+      if (authData?.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([
+            {
+              id: authData.user.id,
+              email: email.trim().toLowerCase(),
+              username: username.trim().toLowerCase(),
+              full_name: fullName.trim(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+          ]);
+
+        if (profileError) {
+          console.warn('Profile creation warning:', profileError.message);
+          // Continue anyway - profile might be created via trigger
+        }
+
+        // Show success message
+        Alert.alert(
+          'Success! 🎉',
+          'Account created successfully!\n\nPlease check your email to verify your account before logging in.',
+          [
+            {
+              text: 'Go to Login',
+              onPress: () => {
+                // Go back to Login screen
+                navigation.replace('Login');
+              }
+            }
+          ]
+        );
+
+        // Clear form
+        setFullName('');
+        setUsername('');
+        setEmail('');
+        setPassword('');
+        setConfirmPassword('');
       }
-
-      setSuccess('✅ Account created successfully! You can now login.');
-
-      // Clear form
-      setFullName('');
-      setUsername('');
-      setEmail('');
-      setPassword('');
-      setConfirmPassword('');
-
-      // Navigate back to login after 2 seconds
-      setTimeout(() => {
-        navigation.goBack();
-      }, 2000);
-
-    } catch (err) {
-      console.error('Signup error:', err);
-      setError('An unexpected error occurred');
+    } catch (error) {
+      console.error('Signup error:', error);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGoBack = () => {
+    navigation.goBack();
   };
 
   return (
@@ -111,90 +159,133 @@ export default function SignUp({ navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Custom Header with Back Button */}
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={handleGoBack}
+          >
+            <Icon name="arrow-left" size={24} color="#4A90E2" />
+            <Text style={styles.backText}>Back</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.content}>
           <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join Study Challenge</Text>
+          <Text style={styles.subtitle}>Join Study Challenge today!</Text>
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          {success ? <Text style={styles.success}>{success}</Text> : null}
+          <View style={styles.form}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Full Name *</Text>
+              <TextInput
+                placeholder="John Doe"
+                value={fullName}
+                onChangeText={setFullName}
+                style={[
+                  styles.input,
+                  errors.fullName && styles.inputError
+                ]}
+                editable={!loading}
+              />
+              {errors.fullName && (
+                <Text style={styles.errorText}>{errors.fullName}</Text>
+              )}
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Full Name</Text>
-            <TextInput
-              placeholder="John Doe"
-              value={fullName}
-              onChangeText={setFullName}
-              style={styles.input}
-              editable={!loading}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Username *</Text>
+              <TextInput
+                placeholder="johndoe"
+                value={username}
+                onChangeText={setUsername}
+                style={[
+                  styles.input,
+                  errors.username && styles.inputError
+                ]}
+                autoCapitalize="none"
+                editable={!loading}
+              />
+              {errors.username && (
+                <Text style={styles.errorText}>{errors.username}</Text>
+              )}
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Email *</Text>
+              <TextInput
+                placeholder="you@example.com"
+                value={email}
+                onChangeText={setEmail}
+                style={[
+                  styles.input,
+                  errors.email && styles.inputError
+                ]}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                editable={!loading}
+              />
+              {errors.email && (
+                <Text style={styles.errorText}>{errors.email}</Text>
+              )}
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Password *</Text>
+              <TextInput
+                placeholder="At least 6 characters"
+                value={password}
+                onChangeText={setPassword}
+                style={[
+                  styles.input,
+                  errors.password && styles.inputError
+                ]}
+                secureTextEntry
+                editable={!loading}
+              />
+              {errors.password && (
+                <Text style={styles.errorText}>{errors.password}</Text>
+              )}
+              <Text style={styles.passwordHint}>
+                Must be at least 6 characters
+              </Text>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Confirm Password *</Text>
+              <TextInput
+                placeholder="Confirm your password"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                style={[
+                  styles.input,
+                  errors.confirmPassword && styles.inputError
+                ]}
+                secureTextEntry
+                editable={!loading}
+              />
+              {errors.confirmPassword && (
+                <Text style={styles.errorText}>{errors.confirmPassword}</Text>
+              )}
+            </View>
+
+            <AppButton
+              title={loading ? 'Creating Account...' : 'Create Account'}
+              onPress={handleSignUp}
+              disabled={loading}
+              style={styles.signupButton}
             />
+
+            <View style={styles.loginContainer}>
+              <Text style={styles.loginText}>Already have an account?</Text>
+              <TouchableOpacity onPress={handleGoBack} disabled={loading}>
+                <Text style={styles.loginLink}> Login</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Username</Text>
-            <TextInput
-              placeholder="johndoe"
-              value={username}
-              onChangeText={(text) => setUsername(text.toLowerCase())}
-              style={styles.input}
-              autoCapitalize="none"
-              editable={!loading}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              placeholder="you@example.com"
-              value={email}
-              onChangeText={setEmail}
-              style={styles.input}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              editable={!loading}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              placeholder="At least 6 characters"
-              value={password}
-              onChangeText={setPassword}
-              style={styles.input}
-              secureTextEntry
-              editable={!loading}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Confirm Password</Text>
-            <TextInput
-              placeholder="Confirm your password"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              style={styles.input}
-              secureTextEntry
-              editable={!loading}
-            />
-          </View>
-
-          <AppButton
-            title={loading ? 'Creating Account...' : 'Create Account'}
-            onPress={handleSignUp}
-            disabled={loading}
-            style={styles.signupButton}
-          />
-
-          <TouchableOpacity 
-            style={styles.loginLink}
-            onPress={() => navigation.goBack()}
-            disabled={loading}
-          >
-            <Text style={styles.loginText}>
-              Already have an account? <Text style={styles.loginHighlight}>Login</Text>
-            </Text>
-          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -209,14 +300,28 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 40,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  backText: {
+    fontSize: 16,
+    color: '#4A90E2',
+    marginLeft: 8,
+    fontWeight: '500',
+  },
   content: {
     flex: 1,
-    justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 40,
+    paddingBottom: 40,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#4A90E2',
     textAlign: 'center',
@@ -228,48 +333,58 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 32,
   },
+  form: {
+    width: '100%',
+  },
   inputContainer: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   label: {
     fontSize: 14,
     fontWeight: '500',
     color: '#333',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   input: {
     backgroundColor: 'white',
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 8,
+    borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     fontSize: 16,
+  },
+  inputError: {
+    borderColor: '#FF3B30',
+    backgroundColor: '#FFEBEE',
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  passwordHint: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   signupButton: {
     marginTop: 8,
-    marginBottom: 16,
+    marginBottom: 20,
+    height: 52,
   },
-  error: {
-    color: '#FF3B30',
-    textAlign: 'center',
-    marginBottom: 16,
-    fontSize: 14,
-  },
-  success: {
-    color: '#4CAF50',
-    textAlign: 'center',
-    marginBottom: 16,
-    fontSize: 14,
-  },
-  loginLink: {
+  loginContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
   },
   loginText: {
     fontSize: 14,
     color: '#666',
   },
-  loginHighlight: {
+  loginLink: {
+    fontSize: 14,
     color: '#4A90E2',
     fontWeight: '600',
   },

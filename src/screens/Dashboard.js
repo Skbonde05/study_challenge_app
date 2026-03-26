@@ -1,5 +1,4 @@
-// src/screens/Dashboard.js
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,452 +11,295 @@ import {
   Alert,
   ActivityIndicator,
   BackHandler,
+  Image,
+  Dimensions,
+  Platform,
 } from 'react-native';
-import { supabase } from '../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import AppButton from '../components/AppButton';
-import Header from '../components/Header';
+import { useAppTheme } from '../theme/useAppTheme';
+import { useProfile } from '../hooks/useProfile';
+import { useChallenges } from '../hooks/useChallenges';
+import { useSessions } from '../hooks/useSessions';
+import { useRealtime } from '../hooks/useRealtime';
+
+// Sub-components
+import StatCard from '../components/dashboard/StatCard';
+import DailyChallengeCard from '../components/dashboard/DailyChallengeCard';
+import DashboardHeader from '../components/dashboard/DashboardHeader';
+
+const { width } = Dimensions.get('window');
 
 export default function Dashboard({ navigation }) {
-  const [profile, setProfile] = useState(null);
-  const [stats, setStats] = useState({
-    currentStreak: 0,
-    totalHours: 0,
-    completedChallenges: 0,
-    level: 1,
-  });
-  const [recentChallenges, setRecentChallenges] = useState([]);
-  const [dailyChallenge, setDailyChallenge] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const { theme } = useAppTheme();
+  
+  // Data hooks with automatic caching and background fetching
+  const { profile, badges, isLoading: loadingProfile, refetch: refetchProfile } = useProfile();
+  const { 
+    challenges, 
+    dailyChallenge, 
+    isLoading: loadingChallenges, 
+    claimDaily, 
+    refetch: refetchChallenges 
+  } = useChallenges();
+  const { recentSessions, isLoading: loadingSessions, refetch: refetchSessions } = useSessions();
+  
+  // Real-time synchronization
+  useRealtime();
 
-  const getProfile = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigation.replace('Login');
-        return;
-      }
+  const scrollViewRef = useRef(null);
+  const loading = (loadingProfile || loadingChallenges || loadingSessions) && !profile;
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (error) throw error;
-      setProfile(data);
-      
-      // Calculate stats from profile
-      setStats({
-        currentStreak: data.current_streak || 0,
-        totalHours: Math.floor((data.total_study_time || 0) / 60),
-        completedChallenges: data.completed_challenges || 0,
-        level: calculateLevel(data.xp || 0),
-      });
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    }
-  };
-
-  const getRecentChallenges = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Try to fetch challenges
-      const { data: challengesData, error } = await supabase
-        .from('challenges')
-        .select('*')
-        .eq('created_by', user.id)
-        .order('created_at', { ascending: false })
-        .limit(3);
-
-      if (error) {
-        console.warn('Error fetching challenges, using empty array:', error.message);
-        setRecentChallenges([]);
-        return;
-      }
-      
-      setRecentChallenges(challengesData || []);
-    } catch (error) {
-      console.error('Error fetching challenges:', error);
-      setRecentChallenges([]);
-    }
-  };
-
-  const getDailyChallenge = async () => {
-    try {
-      // Mock daily challenge
-      const mockDailyChallenge = {
-        id: 'daily_1',
-        title: 'Study for 60 minutes',
-        description: 'Complete 60 minutes of focused study today',
-        target_minutes: 60,
-        current_minutes: 45,
-        rewards: {
-          coins: 100,
-          xp: 500,
-        },
-        deadline: new Date().setHours(23, 59, 59, 999),
-        is_completed: false,
-      };
-      setDailyChallenge(mockDailyChallenge);
-    } catch (error) {
-      console.error('Error fetching daily challenge:', error);
-    }
-  };
-
-  const calculateLevel = (xp) => {
-    return Math.floor(xp / 1000) + 1;
-  };
-
-  const calculateProgress = (xp) => {
-    const currentLevelXp = xp % 1000;
-    return (currentLevelXp / 1000) * 100;
-  };
-
-  const addXp = async (xpToAdd) => {
-    if (!profile) return;
-
-    try {
-      const newXp = profile.xp + xpToAdd;
-      const { error } = await supabase
-        .from('profiles')
-        .update({ xp: newXp })
-        .eq('id', profile.id);
-
-      if (!error) {
-        setProfile({ ...profile, xp: newXp });
-        setStats(prev => ({
-          ...prev,
-          level: calculateLevel(newXp),
-        }));
-        Alert.alert('Success', `+${xpToAdd} XP added!`);
-      }
-    } catch (error) {
-      console.error('Error adding XP:', error);
-      Alert.alert('Error', 'Failed to add XP');
-    }
-  };
-
-  const claimDailyChallenge = async () => {
-    if (!dailyChallenge || !profile) return;
-
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          coins: (profile.coins || 0) + dailyChallenge.rewards.coins,
-          xp: (profile.xp || 0) + dailyChallenge.rewards.xp,
-        })
-        .eq('id', profile.id);
-
-      if (!error) {
-        Alert.alert(
-          'Challenge Completed!',
-          `🎉 You earned ${dailyChallenge.rewards.coins} coins and ${dailyChallenge.rewards.xp} XP!`
-        );
-        await getProfile();
-        setDailyChallenge(prev => ({ ...prev, is_completed: true }));
-      }
-    } catch (error) {
-      console.error('Error claiming challenge:', error);
-      Alert.alert('Error', 'Failed to claim rewards');
-    }
-  };
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const onRefresh = async () => {
-    setRefreshing(true);
     await Promise.all([
-      getProfile(),
-      getRecentChallenges(),
-      getDailyChallenge(),
+      refetchProfile(),
+      refetchChallenges(),
+      refetchSessions()
     ]);
-    setRefreshing(false);
   };
 
-  const startStudySession = () => {
-    navigation.navigate('Timer');
-  };
-
-  const viewAllChallenges = () => {
-    navigation.navigate('Challenges');
-  };
-
-  const navigateToScreen = (screenName) => {
-    navigation.navigate(screenName);
+  const handleClaimDaily = () => {
+    if (!dailyChallenge || !profile) return;
+    claimDaily({ dailyChallenge, currentProfile: profile }, {
+      onSuccess: () => {
+        Alert.alert('Success', 'Rewards claimed successfully! 🎉');
+      },
+      onError: (err) => {
+        Alert.alert('Error', err.message || 'Failed to claim rewards');
+      }
+    });
   };
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await Promise.all([
-        getProfile(),
-        getRecentChallenges(),
-        getDailyChallenge(),
-      ]);
-      setLoading(false);
-    };
-    loadData();
-
-    // Handle Android back button
     const backAction = () => {
-      if (navigation.isFocused()) {
-        Alert.alert('Hold on!', 'Are you sure you want to exit the app?', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'YES', onPress: () => BackHandler.exitApp() }
-        ]);
-        return true;
-      }
-      return false;
+      Alert.alert('Exit App', 'Are you sure you want to exit?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Exit', onPress: () => BackHandler.exitApp() }
+      ]);
+      return true;
     };
-
-    const backHandler = BackHandler.addEventListener(
-      'hardwareBackPress',
-      backAction
-    );
-
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
     return () => backHandler.remove();
   }, []);
 
+  const calculateProgress = (xp) => {
+    const currentLevelXp = (xp || 0) % 1000;
+    return Math.min((currentLevelXp / 1000) * 100, 100);
+  };
+
+  // Derived state for stats
+  const stats = useMemo(() => ({
+    currentStreak: profile?.current_streak || 0,
+    totalHours: profile?.total_study_time ? Math.floor(profile.total_study_time / 60) : 0,
+    completedChallenges: profile?.completed_challenges || 0,
+    level: profile?.level || 1,
+    rank: profile?.rank || 'Beginner',
+  }), [profile]);
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4A90E2" />
-          <Text style={styles.loadingText}>Loading Dashboard...</Text>
-        </View>
+      <SafeAreaView style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <StatusBar barStyle={theme.colors.statusBar} backgroundColor={theme.colors.primary} />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={[styles.loadingText, { color: theme.colors.secondaryText }]}>Loading Dashboard...</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <StatusBar barStyle={theme.colors.statusBar} backgroundColor={theme.colors.primary} />
+      
+      <LinearGradient
+        colors={[theme.colors.primary, theme.colors.primaryDark]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.fixedHeader}
+      >
+        <DashboardHeader 
+          navigation={navigation} 
+          theme={theme} 
+          badgeCount={badges.length} 
+        />
+      </LinearGradient>
+
       <ScrollView
+        ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={false}
             onRefresh={onRefresh}
-            colors={['#4A90E2']}
-            tintColor="#4A90E2"
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
           />
         }
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: 120 }]}
       >
-        {/* Header Section */}
+        {/* Welcome Section */}
         <LinearGradient
-          colors={['#4A90E2', '#357ABD']}
+          colors={[theme.colors.primary, theme.colors.primaryDark]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.headerGradient}
+          style={styles.welcomeSection}
         >
-          <Header 
-            title="Study Challenge"
-            onProfilePress={() => navigation.navigate('Profile')}
-            profileImage={profile?.avatar_url}
-            showNotification={true}
-            onNotificationPress={() => navigation.navigate('Notifications')}
-          />
-          
-          <View style={styles.welcomeSection}>
-            <Text style={styles.welcomeText}>
-              Hello, {profile?.username || 'Student'}! 👋
-            </Text>
-            <Text style={styles.welcomeSubtitle}>
-              Ready for today's study session?
-            </Text>
-          </View>
-
-          {/* Coins and Gems Display */}
-          <View style={styles.currencySection}>
-            <TouchableOpacity 
-              style={styles.currencyItem}
-              onPress={() => navigation.navigate('Store')}
-            >
-              <Icon name="coin" size={20} color="#FFD700" />
-              <Text style={styles.currencyValue}>{profile?.coins || 0}</Text>
-              <Text style={styles.currencyLabel}>Coins</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.currencyItem}
-              onPress={() => navigation.navigate('Store')}
-            >
-              <Icon name="diamond" size={20} color="#5AC8FA" />
-              <Text style={styles.currencyValue}>{profile?.gems || 0}</Text>
-              <Text style={styles.currencyLabel}>Gems</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Level and XP Card */}
-          <View style={styles.levelCard}>
-            <View style={styles.levelInfo}>
-              <Text style={styles.levelLabel}>LEVEL</Text>
-              <Text style={styles.levelNumber}>{stats.level}</Text>
-            </View>
-            <View style={styles.xpSection}>
-              <View style={styles.xpHeader}>
-                <Text style={styles.xpText}>{profile?.xp || 0} XP</Text>
-                <Text style={styles.nextLevelText}>
-                  Next: {(stats.level * 1000) - (profile?.xp % 1000 || 0)} XP
-                </Text>
-              </View>
-              <View style={styles.progressBar}>
-                <View 
-                  style={[
-                    styles.progressFill,
-                    { width: `${calculateProgress(profile?.xp || 0)}%` }
-                  ]} 
-                />
-              </View>
-            </View>
-          </View>
+          <Text style={[styles.welcomeText, { color: theme.colors.headerText }]}>
+            Hello, {profile?.username || 'Student'}! 👋
+          </Text>
+          <Text style={[styles.welcomeSubtitle, { color: theme.colors.headerText + 'CC' }]}>
+            {stats.rank} • Level {stats.level}
+          </Text>
         </LinearGradient>
 
-        {/* Quick Stats Section */}
-        <View style={styles.statsSection}>
-          <View style={styles.statCard}>
-            <LinearGradient
-              colors={['#FF9500', '#E68500']}
-              style={styles.statIcon}
-            >
-              <Icon name="fire" size={24} color="#FFF" />
-            </LinearGradient>
-            <Text style={styles.statValue}>{stats.currentStreak}</Text>
-            <Text style={styles.statLabel}>Day Streak</Text>
-          </View>
+        {/* Currency Section */}
+        <View style={styles.currencySection}>
+          <TouchableOpacity 
+            style={[styles.currencyItem, { backgroundColor: theme.colors.card }]}
+            onPress={() => navigation.navigate('Store')}
+          >
+            <Icon name="cash" size={20} color="#FFD700" />
+            <Text style={[styles.currencyValue, { color: theme.colors.text }]}>{profile?.coins || 0}</Text>
+            <Text style={[styles.currencyLabel, { color: theme.colors.secondaryText }]}>Coins</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.currencyItem, { backgroundColor: theme.colors.card }]}
+            onPress={() => navigation.navigate('Store')}
+          >
+            <Icon name="diamond" size={20} color="#5AC8FA" />
+            <Text style={[styles.currencyValue, { color: theme.colors.text }]}>{profile?.gems || 0}</Text>
+            <Text style={[styles.currencyLabel, { color: theme.colors.secondaryText }]}>Gems</Text>
+          </TouchableOpacity>
 
-          <View style={styles.statCard}>
-            <LinearGradient
-              colors={['#34C759', '#2AA24F']}
-              style={styles.statIcon}
-            >
-              <Icon name="clock-outline" size={24} color="#FFF" />
-            </LinearGradient>
-            <Text style={styles.statValue}>{stats.totalHours}h</Text>
-            <Text style={styles.statLabel}>Total Hours</Text>
-          </View>
+          <TouchableOpacity 
+            style={[styles.currencyItem, { backgroundColor: theme.colors.card }]}
+            onPress={() => navigation.navigate('Badges')}
+          >
+            <Icon name="trophy" size={20} color="#FF9500" />
+            <Text style={[styles.currencyValue, { color: theme.colors.text }]}>{badges.length}</Text>
+            <Text style={[styles.currencyLabel, { color: theme.colors.secondaryText }]}>Badges</Text>
+          </TouchableOpacity>
+        </View>
 
-          <View style={styles.statCard}>
-            <LinearGradient
-              colors={['#5856D6', '#4A48C7']}
-              style={styles.statIcon}
-            >
-              <Icon name="trophy" size={24} color="#FFF" />
-            </LinearGradient>
-            <Text style={styles.statValue}>{stats.completedChallenges}</Text>
-            <Text style={styles.statLabel}>Challenges</Text>
+        {/* Level Card */}
+        <View style={[styles.levelCard, { backgroundColor: theme.colors.card }]}>
+          <View style={styles.levelInfo}>
+            <Text style={[styles.levelLabel, { color: theme.colors.secondaryText }]}>LEVEL</Text>
+            <Text style={[styles.levelNumber, { color: theme.colors.primary }]}>{stats.level}</Text>
+          </View>
+          <View style={styles.xpSection}>
+            <View style={styles.xpHeader}>
+              <Text style={[styles.xpText, { color: theme.colors.text }]}>{profile?.xp || 0} XP</Text>
+              <Text style={[styles.nextLevelText, { color: theme.colors.secondaryText }]}>
+                Next: {1000 - ((profile?.xp || 0) % 1000)} XP
+              </Text>
+            </View>
+            <View style={[styles.progressBar, { backgroundColor: theme.colors.progressBackground }]}>
+              <View 
+                style={[
+                  styles.progressFill,
+                  { 
+                    width: `${calculateProgress(profile?.xp || 0)}%`,
+                    backgroundColor: theme.colors.progressFill 
+                  }
+                ]} 
+              />
+            </View>
           </View>
         </View>
 
-        {/* Quick Actions for New Features */}
+        {/* Stats Section */}
+        <View style={styles.statsSection}>
+          <StatCard 
+            iconName="fire" 
+            colors={['#FF9500', '#E68500']} 
+            value={stats.currentStreak} 
+            label="Day Streak"
+            theme={theme}
+          />
+          <StatCard 
+            iconName="clock-outline" 
+            colors={['#34C759', '#2AA24F']} 
+            value={`${stats.totalHours}h`} 
+            label="Total Hours"
+            theme={theme}
+          />
+          <StatCard 
+            iconName="trophy" 
+            colors={['#5856D6', '#4A48C7']} 
+            value={stats.completedChallenges} 
+            label="Challenges"
+            theme={theme}
+          />
+        </View>
+
+        {/* Quick Actions */}
         <View style={styles.quickActions}>
           <TouchableOpacity 
             style={styles.quickAction}
             onPress={() => navigation.navigate('Badges')}
           >
-            <LinearGradient colors={['#FFD700', '#FFC107']} style={styles.quickActionIcon}>
+            <View style={[styles.quickActionIcon, { backgroundColor: '#FFD700' }]}>
               <Icon name="trophy" size={24} color="#FFF" />
-            </LinearGradient>
-            <Text style={styles.quickActionText}>Badges</Text>
+            </View>
+            <Text style={[styles.quickActionText, { color: theme.colors.secondaryText }]}>Badges</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
             style={styles.quickAction}
-            onPress={() => navigation.navigate('Leaderboard')}
+            onPress={() => navigation.navigate('LeaderboardTab')}
           >
-            <LinearGradient colors={['#4A90E2', '#357ABD']} style={styles.quickActionIcon}>
+            <View style={[styles.quickActionIcon, { backgroundColor: theme.colors.primary }]}>
               <Icon name="podium" size={24} color="#FFF" />
-            </LinearGradient>
-            <Text style={styles.quickActionText}>Leaderboard</Text>
+            </View>
+            <Text style={[styles.quickActionText, { color: theme.colors.secondaryText }]}>Leaderboard</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
             style={styles.quickAction}
             onPress={() => navigation.navigate('Classrooms')}
           >
-            <LinearGradient colors={['#34C759', '#2AA24F']} style={styles.quickActionIcon}>
+            <View style={[styles.quickActionIcon, { backgroundColor: '#34C759' }]}>
               <Icon name="account-group" size={24} color="#FFF" />
-            </LinearGradient>
-            <Text style={styles.quickActionText}>Groups</Text>
+            </View>
+            <Text style={[styles.quickActionText, { color: theme.colors.secondaryText }]}>Groups</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
             style={styles.quickAction}
             onPress={() => navigation.navigate('Store')}
           >
-            <LinearGradient colors={['#FF9500', '#E68500']} style={styles.quickActionIcon}>
+            <View style={[styles.quickActionIcon, { backgroundColor: '#FF9500' }]}>
               <Icon name="shopping" size={24} color="#FFF" />
-            </LinearGradient>
-            <Text style={styles.quickActionText}>Store</Text>
+            </View>
+            <Text style={[styles.quickActionText, { color: theme.colors.secondaryText }]}>Store</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Daily Challenge Section */}
-        {dailyChallenge && (
-          <View style={styles.dailyChallengeSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Daily Challenge</Text>
-              <TouchableOpacity 
-                onPress={dailyChallenge.is_completed ? null : claimDailyChallenge}
-                disabled={dailyChallenge.is_completed}
-              >
-                <Text style={[
-                  styles.seeAllText,
-                  dailyChallenge.is_completed && styles.disabledText
-                ]}>
-                  {dailyChallenge.is_completed ? 'Claimed' : 'Claim'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.challengeCard}>
-              <Text style={styles.challengeTitle}>{dailyChallenge.title}</Text>
-              <Text style={styles.challengeDescription}>{dailyChallenge.description}</Text>
-              <View style={styles.challengeProgress}>
-                <Text style={styles.challengeProgressText}>
-                  {dailyChallenge.current_minutes}/{dailyChallenge.target_minutes} mins
-                </Text>
-                <View style={styles.challengeProgressBar}>
-                  <View style={[
-                    styles.challengeProgressFill,
-                    { 
-                      width: `${Math.min(
-                        (dailyChallenge.current_minutes / dailyChallenge.target_minutes) * 100,
-                        100
-                      )}%`
-                    }
-                  ]} />
-                </View>
-              </View>
-              <View style={styles.challengeRewards}>
-                <View style={styles.rewardItem}>
-                  <Icon name="coin" size={16} color="#FFD700" />
-                  <Text style={styles.rewardText}>+{dailyChallenge.rewards.coins}</Text>
-                </View>
-                <View style={styles.rewardItem}>
-                  <Icon name="star" size={16} color="#4A90E2" />
-                  <Text style={styles.rewardText}>+{dailyChallenge.rewards.xp} XP</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        )}
+        {/* Daily Challenge */}
+        <DailyChallengeCard 
+          challenge={dailyChallenge} 
+          onClaim={handleClaimDaily} 
+          theme={theme} 
+        />
 
         {/* Study Actions */}
         <View style={styles.actionsSection}>
-          <Text style={styles.sectionTitle}>Study Actions</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Study Actions</Text>
           <View style={styles.actionsGrid}>
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={startStudySession}
+              onPress={() => navigation.navigate('Timer')}
             >
               <LinearGradient
-                colors={['#4A90E2', '#357ABD']}
+                colors={[theme.colors.primary, theme.colors.primaryDark]}
                 style={styles.actionGradient}
               >
                 <Icon name="play-circle" size={32} color="#FFF" />
@@ -470,7 +312,7 @@ export default function Dashboard({ navigation }) {
               onPress={() => navigation.navigate('FocusMusic')}
             >
               <LinearGradient
-                colors={['#AF52DE', '#9C28B1']}
+                colors={['#AF52DE', '#8E44AD']}
                 style={styles.actionGradient}
               >
                 <Icon name="music-note" size={32} color="#FFF" />
@@ -480,77 +322,79 @@ export default function Dashboard({ navigation }) {
 
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('Goals')}
+              onPress={() => navigation.navigate('Challenges')}
             >
               <LinearGradient
                 colors={['#FF9500', '#E68500']}
                 style={styles.actionGradient}
               >
                 <Icon name="target" size={32} color="#FFF" />
-                <Text style={styles.actionText}>Set Goals</Text>
+                <Text style={styles.actionText}>Challenges</Text>
               </LinearGradient>
             </TouchableOpacity>
 
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('Resources')}
+              onPress={() => navigation.navigate('Goals')}
             >
               <LinearGradient
                 colors={['#34C759', '#2AA24F']}
                 style={styles.actionGradient}
               >
-                <Icon name="book-open-variant" size={32} color="#FFF" />
-                <Text style={styles.actionText}>Resources</Text>
+                <Icon name="calendar-check" size={32} color="#FFF" />
+                <Text style={styles.actionText}>Goals</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Recent Challenges */}
+        {/* Active Challenges */}
         <View style={styles.challengesSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Challenges</Text>
-            <TouchableOpacity onPress={viewAllChallenges}>
-              <Text style={styles.seeAllText}>See All</Text>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Active Challenges</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Challenges')}>
+              <Text style={[styles.seeAllText, { color: theme.colors.primary }]}>See All</Text>
             </TouchableOpacity>
           </View>
 
-          {recentChallenges.length > 0 ? (
-            recentChallenges.map((challenge, index) => (
+          {challenges.length > 0 ? (
+            challenges.map((challenge, index) => (
               <TouchableOpacity 
-                key={index} 
-                style={styles.challengeCard}
-                onPress={() => navigation.navigate('Challenges')}
+                key={challenge.id || index} 
+                style={[styles.challengeCard, { backgroundColor: theme.colors.card }]}
+                onPress={() => navigation.navigate('ChallengeDetail', { challengeId: challenge.challenge_id })}
               >
                 <View style={styles.challengeHeader}>
-                  <Text style={styles.challengeTitle}>{challenge.title}</Text>
+                  <Text style={[styles.challengeTitle, { color: theme.colors.text }]}>{challenge.title}</Text>
                   <View style={[
-                    styles.statusBadge,
-                    challenge.is_completed ? styles.completedBadge : styles.activeBadge
+                    styles.difficultyBadge,
+                    { backgroundColor: challenge.difficulty === 'hard' ? '#FF3B30' : 
+                                     challenge.difficulty === 'medium' ? '#FF9500' : '#34C759' }
                   ]}>
-                    <Text style={styles.statusText}>
-                      {challenge.is_completed ? 'Completed' : 'Active'}
+                    <Text style={styles.difficultyText}>
+                      {challenge.difficulty?.toUpperCase() || 'EASY'}
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.challengeDescription}>
+                <Text style={[styles.challengeDescription, { color: theme.colors.secondaryText }]}>
                   {challenge.description || 'No description'}
                 </Text>
                 <View style={styles.progressContainer}>
                   <View style={styles.progressLabels}>
-                    <Text style={styles.progressText}>
+                    <Text style={[styles.progressText, { color: theme.colors.secondaryText }]}>
                       {Math.min(challenge.current_minutes || 0, challenge.target_minutes)} / {challenge.target_minutes} mins
                     </Text>
-                    <Text style={styles.progressPercent}>
+                    <Text style={[styles.progressPercent, { color: theme.colors.primary }]}>
                       {Math.round(((challenge.current_minutes || 0) / challenge.target_minutes) * 100)}%
                     </Text>
                   </View>
-                  <View style={styles.challengeProgressBar}>
+                  <View style={[styles.challengeProgressBar, { backgroundColor: theme.colors.progressBackground }]}>
                     <View 
                       style={[
                         styles.challengeProgressFill,
                         { 
-                          width: `${Math.min(((challenge.current_minutes || 0) / challenge.target_minutes) * 100, 100)}%` 
+                          width: `${Math.min(((challenge.current_minutes || 0) / challenge.target_minutes) * 100, 100)}%`,
+                          backgroundColor: theme.colors.primary
                         }
                       ]} 
                     />
@@ -559,58 +403,47 @@ export default function Dashboard({ navigation }) {
               </TouchableOpacity>
             ))
           ) : (
-            <View style={styles.emptyChallenges}>
-              <Icon name="target" size={48} color="#CCC" />
-              <Text style={styles.emptyText}>No challenges yet</Text>
-              <Text style={styles.emptySubtext}>Create your first challenge!</Text>
+            <View style={[styles.emptyChallenges, { backgroundColor: theme.colors.card }]}>
+              <Icon name="target" size={48} color={theme.colors.secondaryText} />
+              <Text style={[styles.emptyText, { color: theme.colors.secondaryText }]}>No active challenges</Text>
+              <TouchableOpacity 
+                style={[styles.browseButton, { backgroundColor: theme.colors.primary }]}
+                onPress={() => navigation.navigate('Challenges')}
+              >
+                <Text style={styles.browseButtonText}>Browse Challenges</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
 
-        {/* Daily Goal */}
-        <View style={styles.dailyGoalSection}>
-          <LinearGradient
-            colors={['#5AC8FA', '#34C759']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.dailyGoalCard}
-          >
-            <Icon name="calendar-check" size={48} color="#FFF" />
-            <View style={styles.goalContent}>
-              <Text style={styles.goalTitle}>Daily Goal</Text>
-              <Text style={styles.goalSubtitle}>Study for 2 hours today</Text>
-              <View style={styles.goalProgress}>
-                <Text style={styles.goalProgressText}>45% Complete</Text>
-                <View style={styles.goalProgressBar}>
-                  <View style={[styles.goalProgressFill, { width: '45%' }]} />
-                </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.goalButton}
-                onPress={() => navigation.navigate('Goals')}
-              >
-                <Text style={styles.goalButtonText}>Set Goal</Text>
+        {/* Recent Study Sessions */}
+        {recentSessions.length > 0 && (
+          <View style={styles.sessionsSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Sessions</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('History')}>
+                <Text style={[styles.seeAllText, { color: theme.colors.primary }]}>See All</Text>
               </TouchableOpacity>
             </View>
-          </LinearGradient>
-        </View>
+            {recentSessions.map((session, index) => (
+              <View key={session.id || index} style={[styles.sessionCard, { backgroundColor: theme.colors.card }]}>
+                <View style={styles.sessionHeader}>
+                  <Text style={[styles.sessionTitle, { color: theme.colors.text }]}>{session.session_title || 'Study Session'}</Text>
+                  <Text style={[styles.sessionDuration, { color: theme.colors.primary }]}>{session.duration_minutes} min</Text>
+                </View>
+                {session.subject && (
+                  <Text style={[styles.sessionSubject, { color: theme.colors.secondaryText }]}>{session.subject}</Text>
+                )}
+                <Text style={[styles.sessionDate, { color: theme.colors.secondaryText }]}>
+                  {new Date(session.created_at).toLocaleDateString()}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
 
-        {/* Logout Button */}
-        <View style={styles.logoutSection}>
-          <AppButton
-            title="Logout"
-            onPress={async () => {
-              try {
-                await supabase.auth.signOut();
-                navigation.replace('Login');
-              } catch (error) {
-                console.error('Error logging out:', error);
-                Alert.alert('Error', 'Failed to logout');
-              }
-            }}
-            style={styles.logoutButton}
-          />
-        </View>
+        {/* Bottom Spacer */}
+        <View style={{ height: 30 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -619,74 +452,93 @@ export default function Dashboard({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F7',
-  },
-  scrollContent: {
-    paddingBottom: 30,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F5F5F7',
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#666',
+    fontWeight: '500',
   },
-  headerGradient: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 40,
+  fixedHeader: {
+    paddingTop: Platform.OS === 'ios' ? 45 : 30,
+    paddingHorizontal: 0, // Header component handles padding
+    paddingBottom: 0,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 40,
   },
   welcomeSection: {
-    marginTop: 20,
+    borderRadius: 24,
+    padding: 24,
+    marginTop: -80,
     marginBottom: 20,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
   welcomeText: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#FFF',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   welcomeSubtitle: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '600',
   },
   currencySection: {
     flexDirection: 'row',
     marginBottom: 20,
+    justifyContent: 'space-between',
   },
   currencyItem: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     borderRadius: 20,
-    marginRight: 12,
-    minWidth: 100,
+    flex: 1,
+    marginHorizontal: 4,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   currencyValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFF',
-    marginLeft: 6,
-    marginRight: 4,
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 6,
+    marginBottom: 2,
   },
   currencyLabel: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '600',
   },
   levelCard: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: 24,
+    padding: 24,
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 20,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
   },
   levelInfo: {
     marginRight: 20,
@@ -694,13 +546,13 @@ const styles = StyleSheet.create({
   },
   levelLabel: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '700',
     marginBottom: 4,
+    letterSpacing: 1,
   },
   levelNumber: {
-    fontSize: 36,
+    fontSize: 40,
     fontWeight: 'bold',
-    color: '#FFF',
   },
   xpSection: {
     flex: 1,
@@ -708,120 +560,74 @@ const styles = StyleSheet.create({
   xpHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   xpText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#FFF',
+    fontWeight: '700',
   },
   nextLevelText: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '600',
   },
   progressBar: {
-    height: 6,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 3,
+    height: 8,
+    borderRadius: 4,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#FFD700',
-    borderRadius: 3,
+    borderRadius: 4,
   },
   statsSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    marginTop: -20,
-    marginBottom: 20,
-  },
-  statCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  statIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1D1D1F',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#8E8E93',
+    marginBottom: 24,
   },
   quickActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 24,
   },
   quickAction: {
     alignItems: 'center',
     width: '23%',
   },
   quickActionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
+    width: 60,
+    height: 60,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
+    elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 4,
-    elevation: 2,
   },
   quickActionText: {
     fontSize: 12,
-    color: '#666',
     textAlign: 'center',
-  },
-  dailyChallengeSection: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
+    fontWeight: '600',
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#1D1D1F',
+    letterSpacing: 0.5,
   },
   seeAllText: {
-    color: '#4A90E2',
     fontSize: 14,
-    fontWeight: '600',
-  },
-  disabledText: {
-    color: '#CCC',
+    fontWeight: '700',
   },
   actionsSection: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 24,
   },
   actionsGrid: {
     flexDirection: 'row',
@@ -830,15 +636,15 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     width: '48%',
-    height: 100,
-    marginBottom: 15,
-    borderRadius: 16,
+    height: 110,
+    marginBottom: 16,
+    borderRadius: 20,
     overflow: 'hidden',
+    elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
-    elevation: 5,
   },
   actionGradient: {
     flex: 1,
@@ -847,57 +653,48 @@ const styles = StyleSheet.create({
   },
   actionText: {
     color: '#FFF',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     marginTop: 8,
   },
   challengesSection: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 24,
   },
   challengeCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 3,
   },
   challengeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   challengeTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1D1D1F',
+    fontSize: 18,
+    fontWeight: '700',
     flex: 1,
   },
-  challengeDescription: {
-    fontSize: 14,
-    color: '#8E8E93',
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
+  difficultyBadge: {
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 10,
   },
-  completedBadge: {
-    backgroundColor: '#34C75920',
+  difficultyText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFF',
   },
-  activeBadge: {
-    backgroundColor: '#4A90E220',
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
+  challengeDescription: {
+    fontSize: 15,
+    marginBottom: 16,
+    lineHeight: 22,
   },
   progressContainer: {
     marginTop: 8,
@@ -908,132 +705,79 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   progressText: {
-    fontSize: 12,
-    color: '#8E8E93',
+    fontSize: 13,
+    fontWeight: '600',
   },
   progressPercent: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#4A90E2',
+    fontSize: 13,
+    fontWeight: '700',
   },
   challengeProgressBar: {
-    height: 6,
-    backgroundColor: '#E5E5EA',
-    borderRadius: 3,
+    height: 8,
+    borderRadius: 4,
     overflow: 'hidden',
   },
   challengeProgressFill: {
     height: '100%',
-    backgroundColor: '#4A90E2',
-    borderRadius: 3,
+    borderRadius: 4,
   },
-  challengeProgress: {
-    marginBottom: 12,
+  sessionsSection: {
+    marginBottom: 24,
   },
-  challengeProgressText: {
-    fontSize: 14,
-    color: '#666',
+  sessionCard: {
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  sessionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
-  challengeRewards: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  sessionTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    flex: 1,
   },
-  rewardItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 16,
+  sessionDuration: {
+    fontSize: 15,
+    fontWeight: '700',
   },
-  rewardText: {
-    fontSize: 14,
+  sessionDate: {
+    fontSize: 13,
     fontWeight: '600',
-    color: '#1D1D1F',
-    marginLeft: 4,
   },
   emptyChallenges: {
-    backgroundColor: '#FFF',
-    borderRadius: 16,
+    borderRadius: 24,
     padding: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
   },
   emptyText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#8E8E93',
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#C7C7CC',
-  },
-  dailyGoalSection: {
-    paddingHorizontal: 20,
+    fontSize: 17,
+    fontWeight: '700',
+    marginTop: 16,
     marginBottom: 20,
   },
-  dailyGoalCard: {
-    borderRadius: 20,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 5,
+  browseButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
   },
-  goalContent: {
-    flex: 1,
-    marginLeft: 20,
-  },
-  goalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  browseButtonText: {
     color: '#FFF',
-    marginBottom: 4,
-  },
-  goalSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: 12,
-  },
-  goalProgress: {
-    marginBottom: 16,
-  },
-  goalProgressText: {
-    fontSize: 12,
-    color: '#FFF',
-    marginBottom: 8,
-  },
-  goalProgressBar: {
-    height: 6,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  goalProgressFill: {
-    height: '100%',
-    backgroundColor: '#FFF',
-    borderRadius: 3,
-  },
-  goalButton: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  goalButtonText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  logoutSection: {
-    paddingHorizontal: 20,
-    paddingBottom: 30,
-  },
-  logoutButton: {
-    backgroundColor: '#FF3B30',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

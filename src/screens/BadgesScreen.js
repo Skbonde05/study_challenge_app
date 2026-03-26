@@ -1,94 +1,55 @@
-// src/screens/BadgesScreen.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
   ActivityIndicator,
+  FlatList,
+  Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { supabase } from '../services/supabase';
+import { useAppTheme } from '../theme/useAppTheme';
+import { useBadges } from '../hooks/useBadges';
+import { useProfile } from '../hooks/useProfile';
+import { useRealtime } from '../hooks/useRealtime';
 
 const BadgesScreen = ({ navigation }) => {
-  const [badges, setBadges] = useState([]);
-  const [earnedBadges, setEarnedBadges] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { theme } = useAppTheme();
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [userStats, setUserStats] = useState({
-    totalStudyTime: 0,
-    currentStreak: 0,
-    completedSessions: 0,
-  });
 
-  useEffect(() => {
-    loadBadges();
-    loadUserStats();
-  }, []);
+  // Unified hooks for data management
+  const { profile } = useProfile();
+  const { badges, earnedBadges, isLoading, refetch } = useBadges();
+  
+  // Real-time updates for achievements
+  useRealtime();
 
-  const loadBadges = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  const categories = ['All', 'Streak', 'Time', 'Sessions', 'Subject', 'Special'];
 
-      // Get all badges
-      const { data: allBadges, error: badgesError } = await supabase
-        .from('badges')
-        .select('*')
-        .order('requirement', { ascending: true });
+  const stats = useMemo(() => ({
+    earnedCount: earnedBadges.length,
+    totalCount: badges.length,
+    percentage: badges.length > 0 ? Math.round((earnedBadges.length / badges.length) * 100) : 0,
+    legendaryCount: earnedBadges.filter(eb => eb.badges?.rarity === 'legendary').length
+  }), [badges, earnedBadges]);
 
-      if (badgesError) throw badgesError;
+  const filteredBadges = useMemo(() => {
+    if (selectedCategory === 'All') return badges;
+    return badges.filter(b => b.category.toLowerCase() === selectedCategory.toLowerCase());
+  }, [badges, selectedCategory]);
 
-      // Get user's earned badges
-      const { data: userBadges, error: userBadgesError } = await supabase
-        .from('user_badges')
-        .select('badge_id')
-        .eq('user_id', user.id);
+  const calculateProgress = (badge) => {
+    const isEarned = earnedBadges.some(eb => eb.badge_id === badge.id);
+    if (isEarned) return 100;
 
-      if (userBadgesError) throw userBadgesError;
-
-      setBadges(allBadges || []);
-      setEarnedBadges(userBadges?.map(b => b.badge_id) || []);
-    } catch (error) {
-      console.error('Error loading badges:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadUserStats = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Get user profile for stats
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('total_study_time, current_streak')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError) throw profileError;
-
-      // Get total completed sessions
-      const { count: sessionsCount, error: sessionsError } = await supabase
-        .from('study_sessions')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-
-      if (sessionsError) throw sessionsError;
-
-      setUserStats({
-        totalStudyTime: profile?.total_study_time || 0,
-        currentStreak: profile?.current_streak || 0,
-        completedSessions: sessionsCount || 0,
-      });
-    } catch (error) {
-      console.error('Error loading user stats:', error);
+    switch (badge.category.toLowerCase()) {
+      case 'streak': return Math.min(((profile?.current_streak || 0) / badge.requirement) * 100, 100);
+      case 'time': return Math.min(((profile?.total_study_time || 0) / badge.requirement) * 100, 100);
+      case 'sessions': return Math.min(((profile?.completed_sessions || 0) / badge.requirement) * 100, 100);
+      default: return 0;
     }
   };
 
@@ -101,568 +62,128 @@ const BadgesScreen = ({ navigation }) => {
     }
   };
 
-  const getRarityLabel = (rarity) => {
-    switch (rarity) {
-      case 'legendary': return 'Legendary';
-      case 'epic': return 'Epic';
-      case 'rare': return 'Rare';
-      default: return 'Common';
-    }
-  };
-
-  const getCategoryBadges = () => {
-    if (selectedCategory === 'All') return badges;
-    return badges.filter(badge => badge.category.toLowerCase() === selectedCategory.toLowerCase());
-  };
-
-  const calculateProgress = (badge) => {
-    switch (badge.category) {
-      case 'streak':
-        return Math.min((userStats.currentStreak / badge.requirement) * 100, 100);
-      case 'time':
-        return Math.min((userStats.totalStudyTime / badge.requirement) * 100, 100);
-      case 'subject':
-        // For subject badges, we'd need to track subject-specific sessions
-        return 0;
-      case 'special':
-        // Special badges have different requirements
-        return 0;
-      default:
-        return 0;
-    }
-  };
-
-  const getCategoryIcon = (category) => {
-    switch (category.toLowerCase()) {
-      case 'streak': return 'fire';
-      case 'time': return 'clock-outline';
-      case 'subject': return 'book-open-page-variant';
-      case 'special': return 'star';
-      default: return 'trophy';
-    }
-  };
-
-  const categories = ['All', 'Streak', 'Time', 'Subject', 'Special'];
-
-  if (loading) {
+  const renderBadgeItem = ({ item }) => {
+    const isEarned = earnedBadges.some(eb => eb.badge_id === item.id);
+    const progress = calculateProgress(item);
+    const rarityColor = getRarityColor(item.rarity);
+    
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4A90E2" />
-          <Text style={styles.loadingText}>Loading achievements...</Text>
+      <TouchableOpacity 
+        style={[styles.badgeCard, { backgroundColor: theme.colors.card }]}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.iconBox, { backgroundColor: isEarned ? rarityColor + '20' : theme.colors.background }]}>
+          <Text style={styles.emoji}>{item.icon}</Text>
+          {!isEarned && <View style={styles.lock}><Icon name="lock" size={16} color={theme.colors.secondaryText} /></View>}
         </View>
-      </SafeAreaView>
-    );
-  }
 
-  const filteredBadges = getCategoryBadges();
-  const earnedCount = earnedBadges.length;
-  const totalCount = badges.length;
-  const legendaryCount = badges.filter(b => earnedBadges.includes(b.id) && b.rarity === 'legendary').length;
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Icon name="arrow-left" size={24} color="#1D1D1F" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Achievements</Text>
-        <View style={styles.headerRight}>
-          <Text style={styles.badgeCount}>
-            {earnedCount}/{totalCount}
-          </Text>
-        </View>
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
-        {/* Stats Card */}
-        <View style={styles.statsCard}>
-          <LinearGradient
-            colors={['#4A90E2', '#357ABD']}
-            style={styles.statsGradient}
-          >
-            <View style={styles.statItem}>
-              <Icon name="trophy" size={32} color="#FFF" />
-              <Text style={styles.statValue}>{earnedCount}</Text>
-              <Text style={styles.statLabel}>Badges</Text>
+        <View style={styles.badgeInfo}>
+          <View style={styles.badgeHeader}>
+            <Text style={[styles.badgeName, { color: theme.colors.text }]}>{item.name}</Text>
+            <View style={[styles.rarityBadge, { backgroundColor: rarityColor }]}>
+              <Text style={styles.rarityText}>{item.rarity.toUpperCase()}</Text>
             </View>
-            
-            <View style={styles.statDivider} />
-            
-            <View style={styles.statItem}>
-              <Icon name="crown" size={32} color="#FFD700" />
-              <Text style={styles.statValue}>{legendaryCount}</Text>
-              <Text style={styles.statLabel}>Legendary</Text>
-            </View>
-            
-            <View style={styles.statDivider} />
-            
-            <View style={styles.statItem}>
-              <Icon name="progress-check" size={32} color="#FFF" />
-              <Text style={styles.statValue}>
-                {totalCount > 0 ? Math.round((earnedCount / totalCount) * 100) : 0}%
-              </Text>
-              <Text style={styles.statLabel}>Complete</Text>
-            </View>
-          </LinearGradient>
-        </View>
-
-        {/* Categories */}
-        <View style={styles.categoriesSection}>
-          <Text style={styles.sectionTitle}>Categories</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesContainer}
-          >
-            {categories.map((category) => (
-              <TouchableOpacity 
-                key={category}
-                style={[
-                  styles.categoryButton,
-                  selectedCategory === category && styles.categoryButtonActive
-                ]}
-                onPress={() => setSelectedCategory(category)}
-              >
-                <Icon 
-                  name={getCategoryIcon(category)} 
-                  size={20} 
-                  color={selectedCategory === category ? '#4A90E2' : '#8E8E93'} 
-                />
-                <Text style={[
-                  styles.categoryText,
-                  selectedCategory === category && styles.categoryTextActive
-                ]}>
-                  {category}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Badges Grid */}
-        <View style={styles.badgesSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>
-              {selectedCategory === 'All' ? 'All Badges' : `${selectedCategory} Badges`}
-            </Text>
-            <Text style={styles.badgesCount}>
-              {filteredBadges.length} total
-            </Text>
           </View>
-
-          {filteredBadges.length > 0 ? (
-            filteredBadges.map((badge) => {
-              const isEarned = earnedBadges.includes(badge.id);
-              const progress = calculateProgress(badge);
-              
-              return (
-                <View key={badge.id} style={styles.badgeCard}>
-                  <View style={[
-                    styles.badgeIconContainer,
-                    { backgroundColor: isEarned ? getRarityColor(badge.rarity) + '20' : '#F2F2F7' }
-                  ]}>
-                    <Text style={styles.badgeEmoji}>{badge.icon}</Text>
-                    {!isEarned && (
-                      <View style={styles.lockedOverlay}>
-                        <Icon name="lock" size={20} color="#8E8E93" />
-                      </View>
-                    )}
-                  </View>
-                  
-                  <View style={styles.badgeInfo}>
-                    <View style={styles.badgeHeader}>
-                      <Text style={styles.badgeName}>{badge.name}</Text>
-                      <View style={[
-                        styles.rarityBadge,
-                        { backgroundColor: getRarityColor(badge.rarity) }
-                      ]}>
-                        <Text style={styles.rarityText}>
-                          {getRarityLabel(badge.rarity)}
-                        </Text>
-                      </View>
-                    </View>
-                    
-                    <Text style={styles.badgeDescription}>{badge.description}</Text>
-                    
-                    <View style={styles.badgeRewards}>
-                      <View style={styles.rewardItem}>
-                        <Icon name="coin" size={16} color="#FFD700" />
-                        <Text style={styles.rewardText}>+{badge.coins_reward}</Text>
-                      </View>
-                      {badge.gems_reward > 0 && (
-                        <View style={styles.rewardItem}>
-                          <Icon name="diamond" size={16} color="#5AC8FA" />
-                          <Text style={styles.rewardText}>+{badge.gems_reward}</Text>
-                        </View>
-                      )}
-                    </View>
-                    
-                    <View style={styles.progressContainer}>
-                      <Text style={styles.progressText}>
-                        {badge.category === 'time' 
-                          ? `${userStats.totalStudyTime}/${badge.requirement} minutes`
-                          : badge.category === 'streak'
-                          ? `${userStats.currentStreak}/${badge.requirement} days`
-                          : `Requirement: ${badge.requirement}`
-                        }
-                      </Text>
-                      {!isEarned && progress > 0 && (
-                        <View style={styles.progressBar}>
-                          <View 
-                            style={[
-                              styles.progressFill,
-                              { width: `${progress}%` }
-                            ]} 
-                          />
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                  
-                  {isEarned ? (
-                    <View style={styles.earnedBadge}>
-                      <Icon name="check-circle" size={24} color="#34C759" />
-                    </View>
-                  ) : (
-                    <View style={styles.lockedBadge}>
-                      <Icon name="lock" size={20} color="#8E8E93" />
-                    </View>
-                  )}
-                </View>
-              );
-            })
-          ) : (
-            <View style={styles.emptyState}>
-              <Icon name="trophy-outline" size={64} color="#E5E5EA" />
-              <Text style={styles.emptyStateTitle}>No badges found</Text>
-              <Text style={styles.emptyStateText}>
-                No badges available in {selectedCategory.toLowerCase()} category
-              </Text>
+          <Text style={[styles.badgeDescription, { color: theme.colors.secondaryText }]} numberOfLines={2}>{item.description}</Text>
+          
+          {!isEarned && (
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}><View style={[styles.progressFill, { width: `${progress}%`, backgroundColor: theme.colors.primary }]} /></View>
+              <Text style={[styles.progressVal, { color: theme.colors.secondaryText }]}>{Math.round(progress)}%</Text>
             </View>
           )}
         </View>
+      </TouchableOpacity>
+    );
+  };
 
-        {/* Help Section */}
-        <View style={styles.helpSection}>
-          <Text style={styles.helpTitle}>How to earn badges?</Text>
-          <View style={styles.helpTips}>
-            <View style={styles.tipItem}>
-              <Icon name="fire" size={20} color="#FF9500" />
-              <Text style={styles.tipText}>Maintain study streaks</Text>
-            </View>
-            <View style={styles.tipItem}>
-              <Icon name="clock-outline" size={20} color="#4A90E2" />
-              <Text style={styles.tipText}>Study more hours</Text>
-            </View>
-            <View style={styles.tipItem}>
-              <Icon name="star" size={20} color="#FFD700" />
-              <Text style={styles.tipText}>Complete special challenges</Text>
-            </View>
-            <View style={styles.tipItem}>
-              <Icon name="book-open" size={20} color="#34C759" />
-              <Text style={styles.tipText}>Study different subjects</Text>
-            </View>
-          </View>
+  if (isLoading && !badges.length) {
+    return (
+      <View style={[styles.loadingBox, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
+      
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: theme.colors.primary }]}>
+        <View style={styles.headerTop}>
+          <TouchableOpacity onPress={() => navigation.goBack()}><Icon name="arrow-left" size={24} color="#FFF" /></TouchableOpacity>
+          <Text style={styles.headerTitle}>Achievements</Text>
+          <View style={{ width: 24 }} />
         </View>
-      </ScrollView>
+
+        {/* Stats Row */}
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}><Text style={styles.statVal}>{stats.earnedCount}</Text><Text style={styles.statLabel}>EARNED</Text></View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}><Text style={styles.statVal}>{stats.legendaryCount}</Text><Text style={[styles.statLabel, { color: '#FFD700' }]}>LEGENDARY</Text></View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}><Text style={styles.statVal}>{stats.percentage}%</Text><Text style={styles.statLabel}>COMPLETE</Text></View>
+        </View>
+      </View>
+
+      <View style={styles.categoryBox}>
+        <FlatList 
+          horizontal showsHorizontalScrollIndicator={false}
+          data={categories}
+          renderItem={({ item }) => (
+            <TouchableOpacity 
+              style={[styles.catBtn, selectedCategory === item && { backgroundColor: theme.colors.primary }]}
+              onPress={() => setSelectedCategory(item)}
+            >
+              <Text style={[styles.catText, { color: selectedCategory === item ? '#FFF' : theme.colors.secondaryText }]}>{item}</Text>
+            </TouchableOpacity>
+          )}
+          keyExtractor={(i) => i}
+        />
+      </View>
+
+      <FlatList
+        data={filteredBadges}
+        renderItem={renderBadgeItem}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        onRefresh={refetch}
+        refreshing={isLoading}
+      />
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F7',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#8E8E93',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#FFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F7',
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1D1D1F',
-  },
-  headerRight: {
-    minWidth: 60,
-    alignItems: 'flex-end',
-  },
-  badgeCount: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4A90E2',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  statsCard: {
-    padding: 20,
-  },
-  statsGradient: {
-    borderRadius: 20,
-    padding: 24,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.9)',
-    textAlign: 'center',
-  },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  categoriesSection: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1D1D1F',
-    marginBottom: 16,
-  },
-  categoriesContainer: {
-    paddingRight: 20,
-  },
-  categoryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: '#F2F2F7',
-  },
-  categoryButtonActive: {
-    backgroundColor: '#4A90E210',
-    borderColor: '#4A90E2',
-  },
-  categoryText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#8E8E93',
-    marginLeft: 8,
-  },
-  categoryTextActive: {
-    color: '#4A90E2',
-  },
-  badgesSection: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  badgesCount: {
-    fontSize: 14,
-    color: '#8E8E93',
-  },
-  badgeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  badgeIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-    position: 'relative',
-  },
-  badgeEmoji: {
-    fontSize: 28,
-  },
-  lockedOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.8)',
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badgeInfo: {
-    flex: 1,
-  },
-  badgeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 6,
-  },
-  badgeName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1D1D1F',
-    flex: 1,
-    marginRight: 8,
-  },
-  rarityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  rarityText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#FFF',
-    textTransform: 'uppercase',
-  },
-  badgeDescription: {
-    fontSize: 14,
-    color: '#8E8E93',
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  badgeRewards: {
-    flexDirection: 'row',
-    marginBottom: 12,
-  },
-  rewardItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  rewardText: {
-    fontSize: 13,
-    color: '#8E8E93',
-    marginLeft: 4,
-  },
-  progressContainer: {
-    marginTop: 4,
-  },
-  progressText: {
-    fontSize: 12,
-    color: '#8E8E93',
-    marginBottom: 4,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: '#F2F2F7',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#4A90E2',
-    borderRadius: 2,
-  },
-  earnedBadge: {
-    marginLeft: 12,
-  },
-  lockedBadge: {
-    marginLeft: 12,
-    opacity: 0.5,
-  },
-  emptyState: {
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1D1D1F',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyStateText: {
-    fontSize: 14,
-    color: '#8E8E93',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  helpSection: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  helpTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1D1D1F',
-    marginBottom: 16,
-  },
-  helpTips: {
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 20,
-  },
-  tipItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  tipText: {
-    fontSize: 14,
-    color: '#1D1D1F',
-    marginLeft: 12,
-    flex: 1,
-  },
+  container: { flex: 1 },
+  loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  header: { padding: 16, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, elevation: 8 },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  headerTitle: { color: '#FFF', fontSize: 20, fontWeight: 'bold' },
+  statsRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20, marginBottom: 10 },
+  statItem: { alignItems: 'center', flex: 1 },
+  statVal: { color: '#FFF', fontSize: 22, fontWeight: 'bold' },
+  statLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: 'bold' },
+  statDivider: { width: 1, height: 30, backgroundColor: 'rgba(255,255,255,0.2)' },
+  categoryBox: { paddingVertical: 16 },
+  catBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, marginLeft: 16, borderImplicit: 1, borderColor: 'rgba(0,0,0,0.05)' },
+  catText: { fontSize: 13, fontWeight: 'bold' },
+  listContent: { padding: 16, paddingBottom: 40 },
+  badgeCard: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 24, marginBottom: 16, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8 },
+  iconBox: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginRight: 16, position: 'relative' },
+  emoji: { fontSize: 28 },
+  lock: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 32, justifyContent: 'center', alignItems: 'center' },
+  badgeInfo: { flex: 1 },
+  badgeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  badgeName: { fontWeight: 'bold', fontSize: 16 },
+  rarityBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
+  rarityText: { color: '#FFF', fontSize: 8, fontWeight: 'bold' },
+  badgeDescription: { fontSize: 12, lineHeight: 18, marginBottom: 12 },
+  progressContainer: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  progressBar: { flex: 1, height: 6, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.05)', overflow: 'hidden' },
+  progressFill: { height: '100%' },
+  progressVal: { fontSize: 10, fontWeight: 'bold', width: 30 },
 });
 
 export default BadgesScreen;
