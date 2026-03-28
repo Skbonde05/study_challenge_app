@@ -54,8 +54,7 @@ export const getUserBadges = async (userId) => {
       badges:badge_id (*)
     `)
     .eq('user_id', userId)
-    .order('earned_at', { ascending: false })
-    .limit(10);
+    .order('earned_at', { ascending: false });
 
   if (error) throw error;
   return data;

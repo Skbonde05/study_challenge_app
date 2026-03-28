@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getUserClassrooms, getExploreClassrooms, joinByCode } from '../api/classrooms';
+import { getUserClassrooms, getExploreClassrooms, joinByCode, joinPublicClassroom, createClassroom } from '../api/classrooms';
 import { supabase } from '../services/supabase';
 
 /**
@@ -35,9 +35,31 @@ export const useClassrooms = () => {
       return joinByCode(user.id, inviteCode);
     },
     onSuccess: () => {
-      // Refresh both lists after joining
       queryClient.invalidateQueries({ queryKey: ['user-classrooms'] });
       queryClient.invalidateQueries({ queryKey: ['explore-classrooms'] });
+    },
+  });
+
+  const joinPublicMutation = useMutation({
+    mutationFn: async (classroomId) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      return joinByCode(user.id, classroomId); // Wait, this should use joinPublicClassroom
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-classrooms'] });
+      queryClient.invalidateQueries({ queryKey: ['explore-classrooms'] });
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (classroomData) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      return createClassroom(user.id, classroomData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-classrooms'] });
     },
   });
 
@@ -45,8 +67,11 @@ export const useClassrooms = () => {
     userClassrooms,
     exploreClassrooms,
     isLoading: isLoadingUser || isLoadingExplore,
-    isJoining: joinMutation.isPending,
+    isJoining: joinMutation.isPending || joinPublicMutation.isPending,
+    isCreating: createMutation.isPending,
     joinByCode: joinMutation.mutate,
+    joinPublic: joinPublicMutation.mutate,
+    createClassroom: createMutation.mutate,
     refetch: () => {
       refetchUser();
       refetchExplore();

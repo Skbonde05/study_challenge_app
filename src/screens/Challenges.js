@@ -35,6 +35,8 @@ export default function Challenges({ navigation }) {
     isJoining,
     claimDaily,
     isClaiming,
+    completeChallenge,
+    isCompleting,
     refetch 
   } = useChallenges();
 
@@ -67,25 +69,43 @@ export default function Challenges({ navigation }) {
     });
   };
 
+  const handleCompleteChallenge = (userChallengeId, coinReward, xpReward) => {
+    completeChallenge({ userChallengeId, coinReward, xpReward }, {
+      onSuccess: () => {
+        Alert.alert('Success', 'Rewards claimed successfully! 🏆');
+      },
+      onError: (err) => {
+        Alert.alert('Error', err.message || 'Failed to claim rewards');
+      }
+    });
+  };
+
   const onRefresh = async () => {
     await refetch();
   };
 
   const ChallengeCard = ({ challenge, type }) => {
-    const isCompleted = challenge.is_completed || (challenge.current_minutes >= challenge.target_minutes);
+    const isReadyToClaim = (challenge.current_minutes >= challenge.target_minutes) && !challenge.is_completed;
     const progress = Math.min((challenge.current_minutes || 0) / (challenge.target_minutes || 60), 1);
+    const difficultyColor = getDifficultyColor(challenge.difficulty);
 
     return (
       <View style={[styles.challengeCard, { backgroundColor: theme.colors.card }]}>
         <View style={styles.cardHeader}>
-          <View style={[styles.difficultyBadge, { backgroundColor: getDifficultyColor(challenge.difficulty) + '20' }]}>
-            <Text style={[styles.difficultyText, { color: getDifficultyColor(challenge.difficulty) }]}>
+          <View style={[styles.difficultyBadge, { backgroundColor: difficultyColor + '15' }]}>
+            <Text style={[styles.difficultyText, { color: difficultyColor }]}>
               {challenge.difficulty?.toUpperCase() || 'EASY'}
             </Text>
           </View>
-          <View style={styles.rewardBadge}>
-            <Icon name="cash" size={14} color="#FFD700" />
-            <Text style={[styles.rewardText, { color: theme.colors.text }]}>+{challenge.coins_reward || 50}</Text>
+          <View style={styles.rewardBox}>
+            <View style={styles.rewardItem}>
+              <Icon name="star" size={12} color="#FFD700" />
+              <Text style={[styles.rewardText, { color: theme.colors.text }]}>+{challenge.xp_reward}</Text>
+            </View>
+            <View style={styles.rewardItem}>
+              <Icon name="cash" size={12} color="#34C759" />
+              <Text style={[styles.rewardText, { color: theme.colors.text }]}>+{challenge.coins_reward}</Text>
+            </View>
           </View>
         </View>
 
@@ -97,7 +117,7 @@ export default function Challenges({ navigation }) {
         <View style={styles.progressSection}>
           <View style={styles.progressHeader}>
             <Text style={[styles.progressText, { color: theme.colors.secondaryText }]}>
-              {challenge.current_minutes || 0} / {challenge.target_minutes} mins
+              {Math.min(challenge.current_minutes || 0, challenge.target_minutes)} / {challenge.target_minutes} mins
             </Text>
             <Text style={[styles.percentText, { color: theme.colors.primary }]}>{Math.round(progress * 100)}%</Text>
           </View>
@@ -112,20 +132,40 @@ export default function Challenges({ navigation }) {
             onPress={() => handleJoinChallenge(challenge.id)}
             disabled={isJoining}
           >
-            {isJoining ? <ActivityIndicator color="#FFF" /> : <Text style={styles.joinButtonText}>Join Challenge</Text>}
+            {isJoining ? <ActivityIndicator color="#FFF" /> : (
+              <View style={styles.btnRow}>
+                <Icon name="plus-circle" size={18} color="#FFF" />
+                <Text style={styles.joinButtonText}>Join Challenge</Text>
+              </View>
+            )}
           </TouchableOpacity>
         ) : (
           <View style={styles.statusSection}>
-            {isCompleted ? (
-              <View style={styles.completedBadge}>
-                <Icon name="check-circle" size={20} color="#34C759" />
-                <Text style={styles.completedText}>Completed</Text>
-              </View>
+            {isReadyToClaim ? (
+              <TouchableOpacity 
+                style={[styles.claimRewardBtn, { backgroundColor: theme.colors.primary }]}
+                onPress={() => handleCompleteChallenge(challenge.id, challenge.coins_reward, challenge.xp_reward)}
+                disabled={isCompleting}
+              >
+                {isCompleting ? <ActivityIndicator color="#FFF" /> : (
+                  <View style={styles.btnRow}>
+                    <Icon name="trophy" size={18} color="#FFF" />
+                    <Text style={styles.claimRewardText}>Claim Rewards</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
             ) : (
-              <View style={styles.activeBadge}>
-                <Icon name="clock-fast" size={20} color={theme.colors.primary} />
-                <Text style={[styles.activeText, { color: theme.colors.primary }]}>In Progress</Text>
-              </View>
+              challenge.is_completed ? (
+                <View style={[styles.completedBadge, { backgroundColor: '#34C75915' }]}>
+                  <Icon name="check-decagram" size={20} color="#34C759" />
+                  <Text style={styles.completedText}>Earned!</Text>
+                </View>
+              ) : (
+                <View style={[styles.activeBadge, { backgroundColor: theme.colors.primary + '10' }]}>
+                  <Icon name="clock-outline" size={20} color={theme.colors.primary} />
+                  <Text style={[styles.activeText, { color: theme.colors.primary }]}>Keep going!</Text>
+                </View>
+              )
             )}
           </View>
         )}
@@ -161,7 +201,8 @@ export default function Challenges({ navigation }) {
 
       <ScrollView 
         style={{ flex: 1 }}
-        contentContainerStyle={[styles.content, { flexGrow: 1, paddingBottom: 100 }]}
+        contentContainerStyle={[styles.content, { minHeight: '100%', paddingBottom: 140 }]}
+        nestedScrollEnabled={true}
         refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} colors={[theme.colors.primary]} />}
       >
         {/* Daily Challenge Card - Featured */}
@@ -289,8 +330,10 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
   difficultyBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   difficultyText: { fontSize: 10, fontWeight: 'bold' },
-  rewardBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  rewardBox: { flexDirection: 'row', gap: 10 },
+  rewardItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   rewardText: { fontSize: 13, fontWeight: 'bold' },
+  btnRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   challengeTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 4 },
   challengeDesc: { fontSize: 13, marginBottom: 16 },
   progressSection: { marginBottom: 16 },
@@ -299,12 +342,14 @@ const styles = StyleSheet.create({
   percentText: { fontSize: 12, fontWeight: 'bold' },
   progressBar: { height: 6, borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 3 },
-  joinButton: { paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
+  joinButton: { paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
   joinButtonText: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
-  statusSection: { alignItems: 'flex-end' },
-  completedBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  claimRewardBtn: { paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+  claimRewardText: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
+  statusSection: {  },
+  completedBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 12, borderRadius: 12, justifyContent: 'center' },
   completedText: { color: '#34C759', fontWeight: 'bold', fontSize: 14 },
-  activeBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  activeBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 12, borderRadius: 12, justifyContent: 'center' },
   activeText: { fontWeight: 'bold', fontSize: 14 },
   // Empty State
   emptyState: { padding: 40, alignItems: 'center', justifyContent: 'center' },

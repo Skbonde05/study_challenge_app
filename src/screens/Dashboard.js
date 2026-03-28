@@ -144,7 +144,7 @@ export default function Dashboard({ navigation }) {
             tintColor={theme.colors.primary}
           />
         }
-        contentContainerStyle={[styles.scrollContent, { paddingTop: 120 }]}
+        contentContainerStyle={[styles.scrollContent, { minHeight: '100%', paddingTop: 120, paddingBottom: 140 }]}
         nestedScrollEnabled={true}
       >
         {/* Welcome Section */}

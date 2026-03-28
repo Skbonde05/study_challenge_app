@@ -136,3 +136,56 @@ export const joinByCode = async (userId, inviteCode) => {
 
   return classroom;
 };
+
+/**
+ * Join a public classroom without code
+ */
+export const joinPublicClassroom = async (userId, classroomId) => {
+  const { error: memberError } = await supabase
+    .from('classroom_members')
+    .insert([{
+      classroom_id: classroomId,
+      user_id: userId,
+      role: 'member'
+    }]);
+
+  if (memberError && memberError.code === '23505') throw new Error('Already a member');
+  if (memberError) throw memberError;
+
+  return { success: true };
+};
+
+/**
+ * Create a new classroom
+ */
+export const createClassroom = async (userId, classroomData) => {
+  const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+  
+  const { data: classroom, error: classroomError } = await supabase
+    .from('classrooms')
+    .insert([{
+      name: classroomData.name,
+      description: classroomData.description,
+      is_public: classroomData.is_public || false,
+      invite_code: inviteCode,
+      created_by: userId,
+      is_active: true
+    }])
+    .select()
+    .single();
+
+  if (classroomError) throw classroomError;
+
+  // Add creator as owner/admin
+  const { error: memberError } = await supabase
+    .from('classroom_members')
+    .insert([{
+      classroom_id: classroom.id,
+      user_id: userId,
+      role: 'admin'
+    }]);
+
+  if (memberError) throw memberError;
+
+  return classroom;
+};

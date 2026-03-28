@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Keyboard,
   TouchableWithoutFeedback,
+  StatusBar,
 } from 'react-native';
 import { supabase } from '../services/supabase';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -125,9 +126,10 @@ export default function Login({ navigation }) {
       style={[styles.container, { flex: 1 }]}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
+      <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={[styles.scrollContent, { flexGrow: 1 }]}
+        contentContainerStyle={[styles.scrollContent, { minHeight: '100%', paddingBottom: 140 }]}
         showsVerticalScrollIndicator={true}
         persistentScrollbar={true}
         keyboardShouldPersistTaps="handled"

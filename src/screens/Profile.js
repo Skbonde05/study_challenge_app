@@ -161,6 +161,18 @@ export default function Profile({ navigation }) {
     }
   };
 
+  const handleCancelEdit = () => {
+    // Reset form to latest profile data to discard unsaved changes
+    if (profile) {
+      setEditForm({
+        full_name: profile.full_name || '',
+        username: profile.username || '',
+        bio: profile.bio || '',
+      });
+    }
+    setEditing(false);
+  };
+
   const handleSaveProfile = () => {
     if (!editForm.username.trim()) {
       Alert.alert('Error', 'Username is required');
@@ -447,7 +459,7 @@ export default function Profile({ navigation }) {
           <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
             <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
               <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Edit Profile</Text>
-              <TouchableOpacity onPress={() => setEditing(false)}><Icon name="close" size={24} color={theme.colors.text} /></TouchableOpacity>
+              <TouchableOpacity onPress={handleCancelEdit}><Icon name="close" size={24} color={theme.colors.text} /></TouchableOpacity>
             </View>
             <ScrollView style={styles.modalBody}>
               <View style={styles.formGroup}>
@@ -478,7 +490,7 @@ export default function Profile({ navigation }) {
               </View>
             </ScrollView>
             <View style={[styles.modalFooter, { borderTopColor: theme.colors.border }]}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setEditing(false)}><Text style={{ color: theme.colors.secondaryText }}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.cancelButton} onPress={handleCancelEdit}><Text style={{ color: theme.colors.secondaryText }}>Cancel</Text></TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.saveButton, { backgroundColor: theme.colors.primary }]} 
                 onPress={handleSaveProfile}

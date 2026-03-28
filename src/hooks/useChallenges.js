@@ -131,6 +131,59 @@ export const useChallenges = () => {
     },
   });
 
+  const completeChallengeMutation = useMutation({
+    mutationFn: async (args) => {
+      const { userChallengeId, coinReward, xpReward } = args;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      
+      const currentProfile = queryClient.getQueryData(['profile']);
+      
+      return completeChallenge(
+        user.id, 
+        userChallengeId, 
+        currentProfile?.coins || 0, 
+        currentProfile?.xp || 0, 
+        coinReward, 
+        xpReward
+      );
+    },
+    onMutate: async (args) => {
+      const { userChallengeId, coinReward, xpReward } = args;
+      await queryClient.cancelQueries({ queryKey: ['challenges'] });
+      await queryClient.cancelQueries({ queryKey: ['profile'] });
+
+      const prevChallenges = queryClient.getQueryData(['challenges']);
+      const prevProfile = queryClient.getQueryData(['profile']);
+
+      // Optimistically remove from active list
+      queryClient.setQueryData(['challenges'], (old = []) => 
+        old.filter(c => c.id !== userChallengeId)
+      );
+
+      // Optimistically update profile rewards
+      queryClient.setQueryData(['profile'], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          coins: (old.coins || 0) + coinReward,
+          xp: (old.xp || 0) + xpReward,
+          completed_challenges: (old.completed_challenges || 0) + 1,
+        };
+      });
+
+      return { prevChallenges, prevProfile };
+    },
+    onError: (err, variables, context) => {
+      queryClient.setQueryData(['challenges'], context.prevChallenges);
+      queryClient.setQueryData(['profile'], context.prevProfile);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['challenges'] });
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+    },
+  });
+
   return {
     challenges,
     dailyChallenge,
@@ -140,6 +193,8 @@ export const useChallenges = () => {
     isJoining: joinChallengeMutation.isPending,
     claimDaily: claimDailyMutation.mutate,
     isClaiming: claimDailyMutation.isPending,
+    completeChallenge: completeChallengeMutation.mutate,
+    isCompleting: completeChallengeMutation.isPending,
     refetch: () => {
       refetchChallenges();
       refetchDaily();

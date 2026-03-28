@@ -152,12 +152,22 @@ export const checkBadgeUnlocks = async (userId, category, value) => {
             },
           ]);
 
-        // Award coins/gems
+        // Award coins/gems - Fetch first for balance calculation (Supabase JS client does not support atomic increment in raw)
+        const { data: currentProf } = await supabase
+          .from('profiles')
+          .select('coins, gems')
+          .eq('id', userId)
+          .single();
+
+        const newCoins = (currentProf?.coins || 0) + (badge.coins_reward || 0);
+        const newGems = (currentProf?.gems || 0) + (badge.gems_reward || 0);
+
         await supabase
           .from('profiles')
           .update({
-            coins: supabase.raw('coins + ?', [badge.coins_reward]),
-            gems: supabase.raw('gems + ?', [badge.gems_reward]),
+            coins: newCoins,
+            gems: newGems,
+            updated_at: new Date().toISOString()
           })
           .eq('id', userId);
 

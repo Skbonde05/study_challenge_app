@@ -192,7 +192,7 @@ const Settings = ({ navigation }) => {
 
       <ScrollView 
         style={{ flex: 1 }}
-        contentContainerStyle={[styles.scrollContent, { flexGrow: 1, paddingBottom: 120 }]} 
+        contentContainerStyle={[styles.scrollContent, { minHeight: '100%', paddingBottom: 140 }]} 
         showsVerticalScrollIndicator={true}
         alwaysBounceVertical={true}
         nestedScrollEnabled={true}

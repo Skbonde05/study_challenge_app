@@ -10,6 +10,7 @@ import {
   Platform,
   ScrollView,
   Alert,
+  StatusBar,
 } from 'react-native';
 import { supabase } from '../services/supabase';
 import AppButton from '../components/AppButton';
@@ -115,9 +116,10 @@ export default function SignUp({ navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={[styles.container, { flex: 1 }]}
     >
+      <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
       <ScrollView 
         style={{ flex: 1 }}
-        contentContainerStyle={[styles.scrollContent, { flexGrow: 1 }]}
+        contentContainerStyle={[styles.scrollContent, { minHeight: '100%', paddingBottom: 140 }]}
         showsVerticalScrollIndicator={true}
         persistentScrollbar={true}
         keyboardShouldPersistTaps="handled"
@@ -224,7 +226,7 @@ export default function SignUp({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
-  scrollContent: { flexGrow: 1, paddingBottom: 140 },
+  scrollContent: { paddingBottom: 140 },
   header: { paddingHorizontal: 16, paddingTop: 10 },
   backButton: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
   backText: { fontSize: 16, color: '#4A90E2', marginLeft: 8, fontWeight: '500' },

@@ -148,7 +148,8 @@ const StoreScreen = ({ navigation }) => {
 
       <ScrollView 
         style={{ flex: 1 }}
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 }}
+        contentContainerStyle={{ minHeight: '100%', paddingBottom: 140 }}
+        nestedScrollEnabled={true}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={false} onRefresh={handleRefresh} colors={[theme.colors.primary]} />}
       >
