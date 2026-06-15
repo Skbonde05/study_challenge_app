@@ -18,7 +18,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../services/supabase';
 import * as ImagePicker from 'expo-image-picker';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useProfile } from '../hooks/useProfile';
 import { useSessions } from '../hooks/useSessions';

@@ -44,7 +44,7 @@ export const useClassrooms = () => {
     mutationFn: async (classroomId) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
-      return joinByCode(user.id, classroomId); // Wait, this should use joinPublicClassroom
+      return joinPublicClassroom(user.id, classroomId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-classrooms'] });

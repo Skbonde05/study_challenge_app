@@ -14,7 +14,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useStore } from '../hooks/useStore';
 import { useProfile } from '../hooks/useProfile';
@@ -135,7 +135,7 @@ const StoreScreen = ({ navigation }) => {
         rightElement={
           <View style={styles.headerCurrency}>
             <View style={[styles.currencyBox, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-              <Icon name="coin" size={16} color="#FFD700" />
+              <Icon name="cash" size={16} color="#FFD700" />
               <Text style={[styles.currencyText, { color: '#FFF' }]}>{currentCoins}</Text>
             </View>
             <View style={[styles.currencyBox, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
@@ -218,7 +218,7 @@ const StoreScreen = ({ navigation }) => {
                   
                   <View style={styles.itemFooter}>
                     <View style={styles.priceRow}>
-                      <Icon name={item.currency === 'coins' ? 'coin' : 'diamond'} size={14} color={item.currency === 'coins' ? '#FFD700' : '#5AC8FA'} />
+                      <Icon name={item.currency === 'coins' ? 'cash' : 'diamond'} size={14} color={item.currency === 'coins' ? '#FFD700' : '#5AC8FA'} />
                       <Text style={[styles.priceValue, { color: !canAfford && !isOwned ? theme.colors.error : theme.colors.text }]}>
                         {item.price}
                       </Text>

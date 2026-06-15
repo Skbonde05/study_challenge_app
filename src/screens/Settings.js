@@ -15,7 +15,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import ScreenHeader from '../components/common/ScreenHeader';
 import { supabase } from '../services/supabase';
 import { useAppTheme } from '../theme/useAppTheme';

@@ -10,13 +10,14 @@ import {
   TextInput,
   ScrollView,
   Alert,
+  ActivityIndicator,
   Vibration,
   Animated,
   Dimensions,
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import Slider from '@react-native-community/slider';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useProfile } from '../hooks/useProfile';
@@ -59,7 +60,7 @@ const Timer = ({ navigation, route }) => {
   // Refs
   const timerRef = useRef(null);
   const [scaleAnim] = useState(new Animated.Value(1));
-  const [pulseAnim] = useState(new Animated.Value(pulseStartValue));
+  const [pulseAnim] = useState(new Animated.Value(1)); // pulseStartValue is 1
   const [rotateAnim] = useState(new Animated.Value(0));
 
   const timerConfigs = useMemo(() => ({

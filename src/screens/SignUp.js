@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { supabase } from '../services/supabase';
 import AppButton from '../components/AppButton';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 
 export default function SignUp({ navigation }) {
   const [fullName, setFullName] = useState('');

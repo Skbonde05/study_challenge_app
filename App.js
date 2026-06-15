@@ -15,7 +15,7 @@ import { useAppTheme } from './src/theme/useAppTheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { persistQueryClient } from '@tanstack/react-query-persist-client';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
-import { getProfile } from './src/api/profile';
+import { ensureProfile, getProfile } from './src/api/profile';
 import { getRecentSessions } from './src/api/sessions';
 import { getUserChallenges } from './src/api/challenges';
 
@@ -75,6 +75,7 @@ import Goals from './src/screens/Goals';
 import Resources from './src/screens/Resources';
 import Notifications from './src/screens/Notifications';
 import Settings from './src/screens/Settings';
+import HistoryScreen from './src/screens/HistoryScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -227,6 +228,10 @@ function AppStackNavigator() {
         name="Notifications"
         component={Notifications}
       />
+      <Stack.Screen
+        name="History"
+        component={HistoryScreen}
+      />
     </Stack.Navigator>
   );
 }
@@ -250,20 +255,49 @@ function AuthStackNavigator() {
 function RootNavigator() {
   const queryClient = useQueryClient();
   const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const shouldUseSplash = Platform.OS !== 'web';
+  const [loading, setLoading] = useState(shouldUseSplash);
   const [theme, setTheme] = useState(themes.light);
 
   // Initialize global real-time synchronization
   useRealtime();
 
   useEffect(() => {
+    const hydrateAuthenticatedUser = async (nextSession) => {
+      if (!nextSession?.user?.id) {
+        return;
+      }
+
+      try {
+        await ensureProfile(nextSession.user);
+      } catch (profileError) {
+        console.error(
+          'Error ensuring user profile:',
+          profileError?.message,
+          profileError
+        );
+      }
+
+      await Promise.allSettled([
+        loadUserTheme(nextSession.user.id),
+        prefetchEssentialData(nextSession),
+      ]);
+    };
+
     // Check initial session
     const checkSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
+        if (session) {
+          await hydrateAuthenticatedUser(session);
+        }
       } catch (error) {
         console.error('Session check error:', error);
+      } finally {
+        if (!shouldUseSplash) {
+          setLoading(false);
+        }
       }
     };
 
@@ -272,15 +306,13 @@ function RootNavigator() {
     // Inside RootNavigator (where session logic lives)
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         console.log('Auth state changed:', event);
         setSession(session);
 
         // Load theme preferences for authenticated user
         if (session) {
-          loadUserTheme(session.user.id);
-          // Prefetch essential data while splash/auth is processing
-          prefetchEssentialData(session);
+          await hydrateAuthenticatedUser(session);
         } else {
           // Clear all cached study data on logout for security and clean state
           queryClient.clear();
@@ -311,7 +343,7 @@ function RootNavigator() {
         .from('user_preferences')
         .select('preferences')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (userPrefs?.preferences?.darkMode) {
         setTheme(themes.dark);

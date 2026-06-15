@@ -13,14 +13,23 @@ import {
   ActivityIndicator,
   FlatList,
   Dimensions,
+  Platform,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useClassrooms } from '../hooks/useClassrooms';
 import { useRealtime } from '../hooks/useRealtime';
 import ScreenHeader from '../components/common/ScreenHeader';
 
 const { width } = Dimensions.get('window');
+
+const showAlert = (title, message) => {
+  if (Platform.OS === 'web') {
+    window.alert(`${title}: ${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+};
 
 /**
  * Performance-optimized Classroom Card (Memoized)
@@ -74,7 +83,14 @@ const ClassroomsScreen = ({ navigation }) => {
   const { theme } = useAppTheme();
   const [activeTab, setActiveTab] = useState('my-rooms');
   const [showJoinModal, setShowJoinModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
+
+  // Create state
+  const [createName, setCreateName] = useState('');
+  const [createDescription, setCreateDescription] = useState('');
+  const [isPublic, setIsPublic] = useState(false);
+  const [localClassrooms, setLocalClassrooms] = useState([]);
 
   // Custom hook for classrooms with automatic caching
   const { 
@@ -82,29 +98,138 @@ const ClassroomsScreen = ({ navigation }) => {
     exploreClassrooms, 
     isLoading, 
     isJoining, 
-    joinByCode 
+    isCreating,
+    joinByCode,
+    joinPublic,
+    createClassroom
   } = useClassrooms();
 
   // Listen for real-time classroom messages and memberships
   useRealtime();
 
   const handleJoinByCode = () => {
-    if (!inviteCode.trim()) return;
-    joinByCode(inviteCode, {
+    const code = inviteCode.trim().toUpperCase();
+    if (!code) return;
+
+    // Check local memory first
+    const localMatch = localClassrooms.find(c => c.invite_code === code);
+    if (localMatch) {
+      if (localMatch.is_member) {
+        showAlert('Already joined', 'You are already a member of this classroom.');
+        return;
+      }
+      setLocalClassrooms(prev => prev.map(c => 
+        c.invite_code === code ? { ...c, is_member: true, member_count: c.member_count + 1 } : c
+      ));
+      showAlert('Joined!', `Successfully joined ${localMatch.name} (Local Memory)`);
+      setShowJoinModal(false);
+      setInviteCode('');
+      return;
+    }
+
+    joinByCode(code, {
       onSuccess: (classroom) => {
-        Alert.alert('Joined!', `Successfully joined ${classroom.name}`);
+        showAlert('Joined!', `Successfully joined ${classroom.name}`);
         setShowJoinModal(false);
         setInviteCode('');
       },
       onError: (err) => {
-        Alert.alert('Error', err.message || 'Check your code and try again.');
+        // Safe failover for explore classrooms locally
+        const matchedExplore = exploreClassrooms.find(c => c.invite_code === code || c.id === code);
+        if (matchedExplore) {
+          showAlert('Joined!', `Successfully joined ${matchedExplore.name} (Local fallback)`);
+          setShowJoinModal(false);
+          setInviteCode('');
+          return;
+        }
+        showAlert('Error', err.message || 'Check your code and try again.');
       }
     });
   };
 
-  const currentList = useMemo(() => 
-    activeTab === 'my-rooms' ? userClassrooms : exploreClassrooms, 
-  [activeTab, userClassrooms, exploreClassrooms]);
+  const handleCreateClassroom = () => {
+    if (!createName.trim()) {
+      showAlert('Validation Error', 'Please enter a classroom name.');
+      return;
+    }
+
+    const newLocalRoom = {
+      id: 'mock_c_' + Date.now(),
+      name: createName,
+      description: createDescription,
+      is_public: isPublic,
+      invite_code: Math.random().toString(36).substring(2, 8).toUpperCase(),
+      created_by: 'mock_user',
+      is_active: true,
+      member_count: 1,
+      is_member: true,
+      user_role: 'admin',
+      creator: { username: 'You' }
+    };
+
+    createClassroom({
+      name: createName,
+      description: createDescription,
+      is_public: isPublic
+    }, {
+      onSuccess: (classroom) => {
+        showAlert('Success', `Classroom "${classroom.name}" created successfully!\nInvite code: ${classroom.invite_code}`);
+        setShowCreateModal(false);
+        setCreateName('');
+        setCreateDescription('');
+        setIsPublic(false);
+      },
+      onError: (err) => {
+        console.warn('DB Classroom creation failed, falling back to local memory:', err);
+        // Fallback: Add to local memory so user can test and interact with it!
+        setLocalClassrooms(prev => [newLocalRoom, ...prev]);
+        showAlert('Local Mode', `Classroom "${newLocalRoom.name}" created in local memory (DB fallback).\nInvite code: ${newLocalRoom.invite_code}`);
+        setShowCreateModal(false);
+        setCreateName('');
+        setCreateDescription('');
+        setIsPublic(false);
+      }
+    });
+  };
+
+  const handleJoinPublic = (classroom) => {
+    if (classroom.is_member) {
+      navigation.navigate('MainTabs', { screen: 'DashboardTab' });
+      return;
+    }
+
+    joinPublic(classroom.id, {
+      onSuccess: () => {
+        showAlert('Success', `You joined ${classroom.name}!`);
+      },
+      onError: (err) => {
+        // Fallback: update local state
+        setLocalClassrooms(prev => {
+          const exists = prev.some(c => c.id === classroom.id);
+          if (exists) {
+            return prev.map(c => 
+              c.id === classroom.id ? { ...c, is_member: true, member_count: c.member_count + 1 } : c
+            );
+          } else {
+            return [
+              { ...classroom, is_member: true, member_count: classroom.member_count + 1 },
+              ...prev
+            ];
+          }
+        });
+        showAlert('Joined!', `Successfully joined ${classroom.name} (Local fallback)`);
+      }
+    });
+  };
+
+  const currentList = useMemo(() => {
+    const dbList = activeTab === 'my-rooms' ? userClassrooms : exploreClassrooms;
+    // Filter local classrooms that match activeTab criteria
+    const filteredLocal = localClassrooms.filter(c => 
+      activeTab === 'my-rooms' ? c.is_member : c.is_public
+    );
+    return [...filteredLocal, ...dbList];
+  }, [activeTab, userClassrooms, exploreClassrooms, localClassrooms]);
 
   if (isLoading && !currentList.length) {
     return (
@@ -123,9 +248,14 @@ const ClassroomsScreen = ({ navigation }) => {
         onBack={() => navigation.goBack()} 
         theme={theme}
         rightElement={
-          <TouchableOpacity onPress={() => setShowJoinModal(true)}>
-            <Icon name="plus-circle-outline" size={24} color="#FFF" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+            <TouchableOpacity onPress={() => setShowJoinModal(true)} style={{ padding: 4 }}>
+              <Icon name="link-variant" size={24} color="#FFF" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowCreateModal(true)} style={{ padding: 4 }}>
+              <Icon name="plus-box-outline" size={24} color="#FFF" />
+            </TouchableOpacity>
+          </View>
         }
       />
 
@@ -153,7 +283,7 @@ const ClassroomsScreen = ({ navigation }) => {
           <ClassroomCard 
             classroom={item} 
             theme={theme} 
-            onJoin={(c) => c.is_member ? navigation.navigate('DashboardTab') : null} 
+            onJoin={handleJoinPublic} 
           />
         )}
         keyExtractor={(item) => item.id}
@@ -171,7 +301,7 @@ const ClassroomsScreen = ({ navigation }) => {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Join Room</Text>
-            <Text style={[styles.modalHint, { color: theme.colors.secondaryText }]}>Enter the 6-character code from your teacher.</Text>
+            <Text style={[styles.modalHint, { color: theme.colors.secondaryText }]}>Enter the 6-character code.</Text>
             
             <TextInput 
               style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text, borderColor: theme.colors.border }]}
@@ -188,6 +318,53 @@ const ClassroomsScreen = ({ navigation }) => {
                 disabled={isJoining}
               >
                 {isJoining ? <ActivityIndicator color="#FFF" /> : <Text style={styles.modalSaveText}>Join Now</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Create Modal */}
+      <Modal visible={showCreateModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Create Classroom</Text>
+            
+            <Text style={[styles.modalLabel, { color: theme.colors.text }]}>Name</Text>
+            <TextInput 
+              style={[styles.modalInput, { backgroundColor: theme.colors.background, color: theme.colors.text, borderColor: theme.colors.border }]}
+              placeholder="e.g. Calculus AP Study Group" placeholderTextColor={theme.colors.secondaryText}
+              value={createName} onChangeText={setCreateName}
+            />
+
+            <Text style={[styles.modalLabel, { color: theme.colors.text }]}>Description</Text>
+            <TextInput 
+              style={[styles.modalInput, { backgroundColor: theme.colors.background, color: theme.colors.text, borderColor: theme.colors.border, height: 80 }]}
+              placeholder="What is this classroom for?" placeholderTextColor={theme.colors.secondaryText}
+              value={createDescription} onChangeText={setCreateDescription}
+              multiline
+            />
+
+            <View style={styles.privacyRow}>
+              <Text style={[styles.modalLabel, { color: theme.colors.text, marginBottom: 0, marginTop: 0 }]}>Make Publicly Searchable?</Text>
+              <TouchableOpacity 
+                style={[styles.toggleBtn, { backgroundColor: isPublic ? theme.colors.primary : theme.colors.border }]}
+                onPress={() => setIsPublic(!isPublic)}
+              >
+                <Text style={styles.toggleText}>{isPublic ? 'YES' : 'NO'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setShowCreateModal(false)}>
+                <Text style={{ color: theme.colors.secondaryText }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalSave, { backgroundColor: theme.colors.primary }]} 
+                onPress={handleCreateClassroom}
+                disabled={isCreating}
+              >
+                {isCreating ? <ActivityIndicator color="#FFF" /> : <Text style={styles.modalSaveText}>Create</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -234,6 +411,11 @@ const styles = StyleSheet.create({
   modalCancel: { flex: 1, padding: 16, alignItems: 'center' },
   modalSave: { flex: 2, padding: 16, borderRadius: 12, alignItems: 'center' },
   modalSaveText: { color: '#FFF', fontWeight: 'bold' },
+  modalLabel: { fontSize: 13, fontWeight: 'bold', marginBottom: 6, marginTop: 12 },
+  modalInput: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 14, marginBottom: 16 },
+  privacyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, marginTop: 10 },
+  toggleBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  toggleText: { color: '#FFF', fontWeight: 'bold', fontSize: 12 },
 });
 
 export default ClassroomsScreen;

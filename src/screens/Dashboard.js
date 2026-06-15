@@ -16,7 +16,7 @@ import {
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useProfile } from '../hooks/useProfile';
 import { useChallenges } from '../hooks/useChallenges';
@@ -366,7 +366,7 @@ export default function Dashboard({ navigation }) {
               <TouchableOpacity 
                 key={challenge.id || index} 
                 style={[styles.challengeCard, { backgroundColor: theme.colors.card }]}
-                onPress={() => navigation.navigate('ChallengeDetail', { challengeId: challenge.challenge_id })}
+                onPress={() => navigation.navigate('Challenges')}
               >
                 <View style={styles.challengeHeader}>
                   <Text style={[styles.challengeTitle, { color: theme.colors.text }]}>{challenge.title}</Text>
@@ -447,7 +447,7 @@ export default function Dashboard({ navigation }) {
         )}
 
         {/* Bottom Spacer */}
-        <View style={{ height: 30 }} />
+        <View style={{ height: 10 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingBottom: 100,
+    paddingBottom: 30,
   },
   welcomeSection: {
     borderRadius: 24,

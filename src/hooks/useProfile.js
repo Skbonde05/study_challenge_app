@@ -31,7 +31,7 @@ export const useProfile = () => {
   });
 
   const { data: badges = [], isLoading: loadingBadges } = useQuery({
-    queryKey: ['badges'],
+    queryKey: ['user-earned-badges'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];

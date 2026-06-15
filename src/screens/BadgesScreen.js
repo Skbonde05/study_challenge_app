@@ -13,7 +13,7 @@ import {
   ScrollView,
   Dimensions,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useBadges } from '../hooks/useBadges';
 import { useProfile } from '../hooks/useProfile';
@@ -415,4 +415,4 @@ const styles = StyleSheet.create({
   doneBtnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
 });
 
-export default BadgesScreen;
+export default BadgesScreen;

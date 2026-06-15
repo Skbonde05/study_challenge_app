@@ -22,7 +22,7 @@
         "NSCameraUsageDescription": "Allow Study Challenge to use the camera for profile pictures.",
         "NSMicrophoneUsageDescription": "Allow Study Challenge to use the microphone for videos."
       },
-      "bundleIdentifier": "com.yourcompany.studychallenge"
+      "bundleIdentifier": "com.studychallenge.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -36,7 +36,7 @@
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
-      "package": "com.yourcompany.studychallenge"
+      "package": "com.studychallenge.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -51,11 +51,6 @@
           "cameraPermission": "The app needs access to your camera to take profile pictures."
         }
       ]
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "your-project-id"
-      }
-    }
+    ]
   }
 }

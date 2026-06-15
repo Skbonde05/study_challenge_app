@@ -12,7 +12,7 @@ import {
   RefreshControl,
   Dimensions,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useChallenges } from '../hooks/useChallenges';
 import { useProfile } from '../hooks/useProfile';

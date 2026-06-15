@@ -16,7 +16,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { supabase } from '../services/supabase';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 
 export default function Login({ navigation }) {
   const [email, setEmail] = useState('');

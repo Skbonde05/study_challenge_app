@@ -4,7 +4,8 @@ import {
   getDailyChallenge, 
   getAvailableChallenges, 
   joinChallenge, 
-  claimDailyChallenge 
+  claimDailyChallenge,
+  completeChallenge 
 } from '../api/challenges';
 import { supabase } from '../services/supabase';
 
