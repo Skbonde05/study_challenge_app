@@ -51,6 +51,11 @@
           "cameraPermission": "The app needs access to your camera to take profile pictures."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b55572da-cdfa-4602-8cd8-1b04cc15be83"
+      }
+    }
   }
 }
