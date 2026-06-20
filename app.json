@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Streakify",
-    "slug": "streakify",
+    "slug": "study-challenge",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/streakify.png",
