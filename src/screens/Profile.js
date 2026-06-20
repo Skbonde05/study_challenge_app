@@ -15,7 +15,7 @@ import {
   Dimensions,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { supabase } from '../services/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
@@ -246,7 +246,7 @@ export default function Profile({ navigation }) {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
         <ScreenHeader 
           title="My Profile" 
@@ -257,12 +257,12 @@ export default function Profile({ navigation }) {
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={[styles.loadingText, { color: theme.colors.secondaryText }]}>Loading your profile...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <ScreenHeader 
         title="My Profile" 
         onBack={() => navigation.goBack()} 
@@ -505,7 +505,7 @@ export default function Profile({ navigation }) {
       </Modal>
 
       {/* Delete Account Modal - Logic simplified for brevity, similar to original Alert */}
-    </SafeAreaView>
+    </View>
   );
 }
 

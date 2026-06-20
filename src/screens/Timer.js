@@ -1,21 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  Modal,
-  TextInput,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-  Vibration,
-  Animated,
-  Dimensions,
-  Platform,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, Modal, TextInput, ScrollView, Alert, ActivityIndicator, Vibration, Animated, Dimensions, Platform,  } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import Slider from '@react-native-community/slider';
@@ -172,7 +156,7 @@ const Timer = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
       
       <ScreenHeader 
@@ -304,7 +288,7 @@ const Timer = ({ navigation, route }) => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 

@@ -1,18 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  ActivityIndicator,
-  FlatList,
-  Platform,
-  Modal,
-  ScrollView,
-  Dimensions,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ActivityIndicator, FlatList, Platform, Modal, ScrollView, Dimensions,  } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useBadges } from '../hooks/useBadges';
@@ -278,7 +265,7 @@ const BadgesScreen = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
       
       <ScreenHeader 
@@ -342,7 +329,7 @@ const BadgesScreen = ({ navigation }) => {
       />
 
       {renderDetailModal()}
-    </SafeAreaView>
+    </View>
   );
 };
 

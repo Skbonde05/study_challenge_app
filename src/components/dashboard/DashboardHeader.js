@@ -17,7 +17,7 @@ const DashboardHeader = ({ navigation, theme, badgeCount = 0 }) => (
       </View>
       <View style={styles.titleContainer}>
         <Text style={[styles.headerTitle, { color: theme.colors.headerText }]}>Streakify</Text>
-        <Text style={[styles.headerSubtitle, { color: theme.colors.headerText + '99' }]}>Study Challenge</Text>
+        <Text style={[styles.headerSubtitle, { color: theme.colors.headerText + '99' }]}>Study Tracker</Text>
       </View>
     </View>
     
@@ -47,35 +47,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 20,
-    height: 100,
+    paddingHorizontal: 16,
+    height: 60,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   logoContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
   logo: {
-    width: 32,
-    height: 32,
+    width: 28,
+    height: 28,
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
     letterSpacing: 0.5,
   },
   headerSubtitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     marginTop: -2,
   },

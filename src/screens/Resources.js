@@ -1,17 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  FlatList,
-  TextInput,
-  Modal,
-  Linking,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, FlatList, TextInput, Modal, Linking, Alert,  } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../theme/useAppTheme';
@@ -188,7 +176,7 @@ export default function Resources({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
       <ScreenHeader 
         title="Study Resources" 
@@ -317,7 +305,7 @@ export default function Resources({ navigation }) {
           </View>
         )}
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 

@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "Study Challenge",
-    "slug": "study-challenge",
+    "name": "Streakify",
+    "slug": "streakify",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/streakify.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -18,16 +18,16 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Allow Study Challenge to access your photos for profile pictures.",
-        "NSCameraUsageDescription": "Allow Study Challenge to use the camera for profile pictures.",
-        "NSMicrophoneUsageDescription": "Allow Study Challenge to use the microphone for videos."
+        "NSPhotoLibraryUsageDescription": "Allow Streakify to access your photos for profile pictures.",
+        "NSCameraUsageDescription": "Allow Streakify to use the camera for profile pictures.",
+        "NSMicrophoneUsageDescription": "Allow Streakify to use the microphone for videos."
       },
       "bundleIdentifier": "com.studychallenge.app"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#4A90E2"
+        "foregroundImage": "./assets/streakify.png",
+        "backgroundColor": "#FFFFFF"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [

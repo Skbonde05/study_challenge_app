@@ -1,14 +1,5 @@
 import React, { useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  StatusBar,
-  FlatList,
-  ActivityIndicator,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, StyleSheet, StatusBar, FlatList, ActivityIndicator, TouchableOpacity,  } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useSessions } from '../hooks/useSessions';
@@ -111,7 +102,7 @@ export default function HistoryScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
       <ScreenHeader 
         title="Study History" 
@@ -170,7 +161,7 @@ export default function HistoryScreen({ navigation }) {
           }
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 

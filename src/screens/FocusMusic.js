@@ -1,15 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  ScrollView,
-  Dimensions,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Dimensions, ActivityIndicator,  } from 'react-native';
 import { Audio } from 'expo-av';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import Slider from '@react-native-community/slider';
@@ -182,7 +172,7 @@ export default function FocusMusic({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
       <ScreenHeader 
         title="Focus Music" 
@@ -321,7 +311,7 @@ export default function FocusMusic({ navigation }) {
           })}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

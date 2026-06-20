@@ -136,7 +136,7 @@ export default function SignUp({ navigation }) {
 
           <View style={styles.content}>
             <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Join Study Challenge today!</Text>
+            <Text style={styles.subtitle}>Join Streakify today!</Text>
 
             <View style={styles.form}>
               <View style={styles.inputContainer}>

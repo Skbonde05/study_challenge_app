@@ -143,7 +143,7 @@ export default function Login({ navigation }) {
                 <View style={styles.logoContainer}>
                   <Icon name="brain" size={60} color="#4A90E2" />
                 </View>
-                <Text style={styles.title}>Study Challenge</Text>
+                <Text style={styles.title}>Streakify</Text>
                 <Text style={styles.subtitle}>Unlock your potential through focused learning</Text>
               </View>
 

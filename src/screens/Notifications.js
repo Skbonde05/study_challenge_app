@@ -1,14 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  FlatList,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, FlatList, ActivityIndicator,  } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useAppTheme } from '../theme/useAppTheme';
 import { useNotifications } from '../hooks/useNotifications';
@@ -103,7 +94,7 @@ export default function Notifications({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
       <ScreenHeader 
         title="Notifications" 
@@ -141,7 +132,7 @@ export default function Notifications({ navigation }) {
           }
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
